@@ -5,6 +5,7 @@ import { getRaterLink } from "@/lib/app-url";
 import { RATER_GROUPS, RATER_GROUP_LABELS, type Rater, type RaterGroup } from "@/lib/types";
 import { AddRaterForm } from "./add-rater-form";
 import { CopyLinkButton } from "./copy-link-button";
+import { ReopenRaterButton } from "./reopen-rater-button";
 
 // Explicit, since Supabase-js calls aren't native fetch() and Next's static
 // analysis can't otherwise tell this page depends on live data.
@@ -188,6 +189,13 @@ export default async function CycleDetailPage({
                         </a>
                       ) : (
                         <span className="text-xs text-zinc-400">No email</span>
+                      )}
+                      {status.label === "Completed" && (
+                        <ReopenRaterButton
+                          raterId={rater.id}
+                          cycleId={id}
+                          raterLabel={rater.full_name ?? "This rater"}
+                        />
                       )}
                     </div>
                   </td>

@@ -126,3 +126,30 @@ export async function addRater(
     return { error: UNEXPECTED_ERROR, successCount: 0 };
   }
 }
+
+export async function reopenRater(
+  raterId: string,
+  cycleId: string,
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  try {
+    const supabase = createAdminClient();
+    // Clears completed_at only — prior answers stay in place so the rater's
+    // existing responses appear pre-filled and only need correcting, not
+    // redoing. The token itself never changes, since the same link is what
+    // the admin has already shared with this rater.
+    const { error } = await supabase
+      .from("raters")
+      .update({ completed_at: null })
+      .eq("id", raterId);
+
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}
