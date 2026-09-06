@@ -3,17 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAssignedItems } from "@/lib/respond/assigned-items";
+import { isLinkExpired } from "@/lib/respond/expiry";
 import type { CommentsValue, CompetencyVariant, RaterGroup, ResponseValue } from "@/lib/types";
 
 const GENERIC_ERROR = "Something went wrong saving that. Please try again.";
 const INVALID_LINK_ERROR = "This link isn't valid.";
 const ALREADY_SUBMITTED_ERROR = "This questionnaire has already been submitted.";
+const LINK_EXPIRED_ERROR = "This link has expired. Please contact whoever invited you.";
 
 interface ActiveRater {
   id: string;
   review_cycle_id: string;
   rater_group: string;
   completed_at: string | null;
+  invited_at: string;
+  link_expiry_days: number;
 }
 
 /**
@@ -28,19 +32,37 @@ async function getActiveRater(
 ): Promise<{ supabase: ReturnType<typeof createAdminClient>; rater: ActiveRater | null; error: string | null }> {
   try {
     const supabase = createAdminClient();
-    const { data: rater, error } = await supabase
+    const { data, error } = await supabase
       .from("raters")
-      .select("id, review_cycle_id, rater_group, completed_at")
+      .select("id, review_cycle_id, rater_group, completed_at, invited_at, review_cycles(link_expiry_days)")
       .eq("token", token)
       .maybeSingle();
 
     if (error) return { supabase, rater: null, error: GENERIC_ERROR };
+    if (!data) return { supabase, rater: null, error: null };
+
+    const cycle = Array.isArray(data.review_cycles) ? data.review_cycles[0] : data.review_cycles;
+    const rater: ActiveRater = {
+      id: data.id,
+      review_cycle_id: data.review_cycle_id,
+      rater_group: data.rater_group,
+      completed_at: data.completed_at,
+      invited_at: data.invited_at,
+      link_expiry_days: cycle?.link_expiry_days ?? 60,
+    };
     return { supabase, rater, error: null };
   } catch {
     // createAdminClient() itself can throw (e.g. missing env vars in a
     // misconfigured deployment) — still must not crash the caller.
     return { supabase: null as unknown as ReturnType<typeof createAdminClient>, rater: null, error: GENERIC_ERROR };
   }
+}
+
+/** Shared guard for the write actions below: null means the rater may write. */
+function checkRaterUsable(rater: ActiveRater): string | null {
+  if (rater.completed_at) return ALREADY_SUBMITTED_ERROR;
+  if (isLinkExpired(rater.invited_at, rater.link_expiry_days)) return LINK_EXPIRED_ERROR;
+  return null;
 }
 
 export async function saveResponse(
@@ -52,7 +74,8 @@ export async function saveResponse(
     const { supabase, rater, error: lookupError } = await getActiveRater(token);
     if (lookupError) return { error: lookupError };
     if (!rater) return { error: INVALID_LINK_ERROR };
-    if (rater.completed_at) return { error: ALREADY_SUBMITTED_ERROR };
+    const guardError = checkRaterUsable(rater);
+    if (guardError) return { error: guardError };
 
     const { error } = await supabase.from("responses").upsert(
       {
@@ -88,7 +111,8 @@ export async function saveForcedChoice(
     const { supabase, rater, error: lookupError } = await getActiveRater(token);
     if (lookupError) return { error: lookupError };
     if (!rater) return { error: INVALID_LINK_ERROR };
-    if (rater.completed_at) return { error: ALREADY_SUBMITTED_ERROR };
+    const guardError = checkRaterUsable(rater);
+    if (guardError) return { error: guardError };
 
     const { error: deleteError } = await supabase
       .from("forced_choice_nominations")
@@ -120,7 +144,8 @@ export async function saveComments(
     const { supabase, rater, error: lookupError } = await getActiveRater(token);
     if (lookupError) return { error: lookupError };
     if (!rater) return { error: INVALID_LINK_ERROR };
-    if (rater.completed_at) return { error: ALREADY_SUBMITTED_ERROR };
+    const guardError = checkRaterUsable(rater);
+    if (guardError) return { error: guardError };
 
     const { error } = await supabase.from("comments").upsert(
       {
@@ -147,6 +172,9 @@ export async function submitQuestionnaire(
     if (lookupError) return { error: lookupError };
     if (!rater) return { error: INVALID_LINK_ERROR };
     if (rater.completed_at) return { error: null };
+    if (isLinkExpired(rater.invited_at, rater.link_expiry_days)) {
+      return { error: LINK_EXPIRED_ERROR };
+    }
 
     const commentsResult = await saveComments(token, comments);
     if (commentsResult.error) return commentsResult;

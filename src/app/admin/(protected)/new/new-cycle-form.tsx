@@ -80,6 +80,25 @@ export function NewCycleForm() {
         </div>
       </div>
 
+      <div>
+        <label htmlFor="link_expiry_days" className="block text-sm font-medium text-zinc-700">
+          Rater link expires after (days)
+        </label>
+        <input
+          id="link_expiry_days"
+          name="link_expiry_days"
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={60}
+          required
+          className="mt-1 block w-32 rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-zinc-500">
+          Raters&apos; links stop working this many days after they&apos;re invited. You can change this later from the cycle page.
+        </p>
+      </div>
+
       <fieldset>
         <legend className="block text-sm font-medium text-zinc-700">Competency 9</legend>
         <div className="mt-2 space-y-2">

@@ -6,6 +6,7 @@ import { RATER_GROUPS, RATER_GROUP_LABELS, type Rater, type RaterGroup } from "@
 import { AddRaterForm } from "./add-rater-form";
 import { CopyLinkButton } from "./copy-link-button";
 import { ReopenRaterButton } from "./reopen-rater-button";
+import { LinkExpiryEditor } from "./link-expiry-editor";
 
 // Explicit, since Supabase-js calls aren't native fetch() and Next's static
 // analysis can't otherwise tell this page depends on live data.
@@ -48,7 +49,7 @@ export default async function CycleDetailPage({
   const { data: cycle, error: cycleError } = await supabase
     .from("review_cycles")
     .select(
-      "id, name, period_start, period_end, status, competency_9_variant, review_subjects(full_name, role_title)",
+      "id, name, period_start, period_end, status, competency_9_variant, link_expiry_days, review_subjects(full_name, role_title)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -99,6 +100,9 @@ export default async function CycleDetailPage({
           <p className="mt-1 text-sm text-zinc-500">
             Competency 9: {COMPETENCY_9_LABELS[cycle.competency_9_variant]}
           </p>
+          <div className="mt-2">
+            <LinkExpiryEditor cycleId={id} initialDays={cycle.link_expiry_days} />
+          </div>
         </div>
         <Link
           href={`/admin/cycles/${id}/report`}

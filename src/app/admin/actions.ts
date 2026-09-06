@@ -26,12 +26,17 @@ export async function createReviewCycle(
   const competency9Variant = String(
     formData.get("competency_9_variant") ?? "standard",
   ) as CompetencyVariant;
+  const linkExpiryDaysRaw = String(formData.get("link_expiry_days") ?? "60").trim();
+  const linkExpiryDays = Number(linkExpiryDaysRaw);
 
   if (!leaderName || !cycleName || !periodStart || !periodEnd) {
     return { error: "Leader name, cycle name, and both dates are required.", successCount: 0 };
   }
   if (periodEnd < periodStart) {
     return { error: "End date can't be before the start date.", successCount: 0 };
+  }
+  if (!Number.isInteger(linkExpiryDays) || linkExpiryDays < 1) {
+    return { error: "Link expiry must be a whole number of days, 1 or more.", successCount: 0 };
   }
 
   // redirect() throws internally to work — it must never land inside this
@@ -67,6 +72,7 @@ export async function createReviewCycle(
         period_start: periodStart,
         period_end: periodEnd,
         competency_9_variant: competency9Variant,
+        link_expiry_days: linkExpiryDays,
       })
       .select("id")
       .single();
@@ -124,6 +130,33 @@ export async function addRater(
     return { error: null, successCount: _prevState.successCount + 1 };
   } catch {
     return { error: UNEXPECTED_ERROR, successCount: 0 };
+  }
+}
+
+export async function updateLinkExpiry(
+  cycleId: string,
+  days: number,
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  if (!Number.isInteger(days) || days < 1) {
+    return { error: "Link expiry must be a whole number of days, 1 or more." };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("review_cycles")
+      .update({ link_expiry_days: days })
+      .eq("id", cycleId);
+
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
   }
 }
 

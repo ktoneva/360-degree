@@ -32,6 +32,7 @@ export interface ReviewCycle {
   period_end: string;
   competency_9_variant: CompetencyVariant;
   status: CycleStatus;
+  link_expiry_days: number;
 }
 
 export interface Rater {

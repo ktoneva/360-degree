@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAssignedItems } from "@/lib/respond/assigned-items";
+import { isLinkExpired } from "@/lib/respond/expiry";
 import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import { Questionnaire } from "./questionnaire";
 
@@ -30,7 +31,7 @@ export default async function RespondPage({
 
   const { data: rater, error: raterError } = await supabase
     .from("raters")
-    .select("id, rater_group, completed_at, review_cycle_id")
+    .select("id, rater_group, completed_at, invited_at, review_cycle_id")
     .eq("token", token)
     .maybeSingle();
 
@@ -49,7 +50,7 @@ export default async function RespondPage({
 
   const { data: cycle, error: cycleError } = await supabase
     .from("review_cycles")
-    .select("competency_9_variant, review_subjects(full_name)")
+    .select("competency_9_variant, link_expiry_days, review_subjects(full_name)")
     .eq("id", rater.review_cycle_id)
     .maybeSingle();
 
@@ -76,6 +77,15 @@ export default async function RespondPage({
       <CenteredMessage
         title="Thank you"
         body={`Your feedback on ${leaderName} has been recorded. Honest feedback is a favour, not a formality — thank you for taking the time.`}
+      />
+    );
+  }
+
+  if (isLinkExpired(rater.invited_at, cycle.link_expiry_days)) {
+    return (
+      <CenteredMessage
+        title="This link has expired"
+        body="This questionnaire link is no longer active. Please contact whoever invited you if you still need to give feedback."
       />
     );
   }
