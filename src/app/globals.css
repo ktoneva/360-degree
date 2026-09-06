@@ -10,6 +10,13 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Coach My Future brand palette, sampled from the logo. */
+  --color-brand-navy: #1e2530;
+  --color-brand-gold: #c39a3e;
+  --color-brand-gold-dark: #b8872b;
+  --color-brand-gold-light: #e8ce60;
+  --color-brand-amber: #d97706;
 }
 
 @media (prefers-color-scheme: dark) {

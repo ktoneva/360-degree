@@ -91,7 +91,7 @@ export function ItemQuestion({
             key={option.value}
             className={`flex min-h-[44px] cursor-pointer items-center rounded-md border px-3 py-2 text-sm transition-colors ${
               selected === option.value
-                ? "border-zinc-900 bg-zinc-900 text-white"
+                ? "border-brand-navy bg-brand-navy text-white"
                 : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"
             }`}
           >
@@ -111,7 +111,7 @@ export function ItemQuestion({
           <label
             className={`flex min-h-[44px] cursor-pointer items-center rounded-md border border-dashed px-3 py-2 text-sm transition-colors ${
               selected === "not_observed"
-                ? "border-zinc-900 bg-zinc-900 text-white"
+                ? "border-brand-navy bg-brand-navy text-white"
                 : "border-zinc-300 text-zinc-500 hover:bg-zinc-50"
             }`}
           >

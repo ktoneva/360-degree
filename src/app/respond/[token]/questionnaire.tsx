@@ -6,6 +6,7 @@ import { ItemQuestion } from "./item-question";
 import { ForcedChoice } from "./forced-choice";
 import { CommentsSection } from "./comments-section";
 import { generalIntro, groupWording, SAFEGUARDING_WORDING } from "@/lib/respond/briefing";
+import { RespondHeader } from "./respond-header";
 import type { AssignedItem, CommentsValue, RaterGroup, ResponseValue } from "@/lib/types";
 
 type ResponseRow = { item_id: string; scale_value: number | null; not_observed: boolean; integrity_value: string | null };
@@ -86,49 +87,57 @@ export function Questionnaire({
 
   if (phase === "intro") {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-        <h1 className="text-xl font-semibold text-zinc-900">Leadership feedback</h1>
-        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
-          {generalIntro(leaderName, items.length)}
-        </p>
-        <button
-          type="button"
-          onClick={() => setPhase("group")}
-          className="mt-8 w-full rounded-md bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-700"
-        >
-          Continue
-        </button>
+      <div className="min-h-screen bg-white">
+        <RespondHeader />
+        <div className="mx-auto flex max-w-md flex-col justify-center px-6 py-14">
+          <h1 className="text-xl font-semibold text-brand-navy">Leadership feedback</h1>
+          <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
+            {generalIntro(leaderName, items.length)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPhase("group")}
+            className="mt-8 w-full rounded-md bg-brand-gold px-4 py-3 text-sm font-medium text-brand-navy hover:bg-brand-gold-dark"
+          >
+            Continue
+          </button>
+        </div>
       </div>
     );
   }
 
   if (phase === "group") {
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-        <h1 className="text-xl font-semibold text-zinc-900">Before you start</h1>
-        <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
-          {groupWording(
-            raterGroup,
-            leaderName,
-            competencyGroups.map(([, group]) => group.name),
-          )}
-        </p>
-        <button
-          type="button"
-          onClick={() => setPhase("form")}
-          className="mt-8 w-full rounded-md bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-700"
-        >
-          Start
-        </button>
+      <div className="min-h-screen bg-white">
+        <RespondHeader />
+        <div className="mx-auto flex max-w-md flex-col justify-center px-6 py-14">
+          <h1 className="text-xl font-semibold text-brand-navy">Before you start</h1>
+          <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
+            {groupWording(
+              raterGroup,
+              leaderName,
+              competencyGroups.map(([, group]) => group.name),
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPhase("form")}
+            className="mt-8 w-full rounded-md bg-brand-gold px-4 py-3 text-sm font-medium text-brand-navy hover:bg-brand-gold-dark"
+          >
+            Start
+          </button>
+        </div>
       </div>
     );
   }
 
   const total = items.length;
   const answeredCount = answeredIds.size;
+  const isComplete = total > 0 && answeredCount === total;
 
   return (
-    <div className="pb-24">
+    <div className="min-h-screen bg-white pb-24">
+      <RespondHeader />
       <div className="sticky top-0 z-10 border-b border-zinc-200 bg-white/95 px-4 py-2 backdrop-blur">
         <div className="mx-auto max-w-2xl">
           <p className="text-xs font-medium text-zinc-600">
@@ -136,7 +145,11 @@ export function Questionnaire({
           </p>
           <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
             <div
-              className="h-full rounded-full bg-zinc-900 transition-all"
+              className={`h-full rounded-full transition-all ${
+                isComplete
+                  ? "bg-gradient-to-r from-[#B8872B] to-[#E8CE60]"
+                  : "bg-brand-amber"
+              }`}
               style={{ width: `${total === 0 ? 0 : (answeredCount / total) * 100}%` }}
             />
           </div>
@@ -150,7 +163,7 @@ export function Questionnaire({
 
           return (
             <section key={competencyNumber}>
-              <h2 className="mb-3 text-lg font-semibold text-zinc-900">
+              <h2 className="mb-3 text-lg font-semibold text-brand-gold">
                 {competencyNumber}. {group.name}
               </h2>
 
@@ -212,7 +225,7 @@ export function Questionnaire({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="w-full rounded-md bg-zinc-900 px-4 py-3 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="w-full rounded-md bg-brand-gold px-4 py-3 text-sm font-medium text-brand-navy hover:bg-brand-gold-dark disabled:opacity-50"
           >
             {isSubmitting ? "Submitting…" : "Submit my feedback"}
           </button>

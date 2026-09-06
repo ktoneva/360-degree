@@ -37,7 +37,7 @@ export function CommentsSection({
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900">Your comments</h2>
+        <h2 className="text-lg font-semibold text-brand-navy">Your comments</h2>
         <p className="mt-1 text-sm text-zinc-600">Optional, but genuinely useful. Shown in full.</p>
       </div>
 
@@ -52,7 +52,7 @@ export function CommentsSection({
             value={value[key]}
             onChange={(e) => onChange({ ...value, [key]: e.target.value })}
             onBlur={handleBlur}
-            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none"
+            className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-brand-navy focus:outline-none"
           />
         </div>
       ))}

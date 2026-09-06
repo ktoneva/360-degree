@@ -61,7 +61,7 @@ export function ForcedChoice({
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900">Development priorities</h2>
+        <h2 className="text-lg font-semibold text-brand-navy">Development priorities</h2>
         <p className="mt-1 text-sm text-zinc-600">
           Pick the 2 behaviours that would make the biggest difference if improved.
         </p>
@@ -71,7 +71,7 @@ export function ForcedChoice({
       <div className="space-y-5">
         {[...byCompetency.entries()].map(([competencyLabel, competencyItems]) => (
           <div key={competencyLabel}>
-            <h3 className="mb-2 text-sm font-semibold text-zinc-500">{competencyLabel}</h3>
+            <h3 className="mb-2 text-sm font-semibold text-brand-gold">{competencyLabel}</h3>
             <div className="space-y-1.5">
               {competencyItems.map((item) => {
                 const isChecked = selected.includes(item.id);
@@ -81,7 +81,7 @@ export function ForcedChoice({
                     key={item.id}
                     className={`flex min-h-[44px] cursor-pointer items-start gap-3 rounded-md border px-3 py-2 text-sm transition-colors ${
                       isChecked
-                        ? "border-zinc-900 bg-zinc-900 text-white"
+                        ? "border-brand-navy bg-brand-navy text-white"
                         : isDisabled
                           ? "cursor-not-allowed border-zinc-100 text-zinc-300"
                           : "border-zinc-200 text-zinc-700 hover:bg-zinc-50"

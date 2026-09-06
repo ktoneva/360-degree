@@ -4,17 +4,33 @@ import { isLinkExpired } from "@/lib/respond/expiry";
 import { checkRateLimit, getClientIp } from "@/lib/respond/rate-limit";
 import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import { Questionnaire } from "./questionnaire";
+import { RespondHeader } from "./respond-header";
 
 // Explicit, since Supabase-js calls aren't native fetch() and Next's static
 // analysis can't otherwise tell this page depends on live data — this must
 // never serve a stale cached page for a different rater's token.
 export const dynamic = "force-dynamic";
 
-function CenteredMessage({ title, body }: { title: string; body: string }) {
+function CenteredMessage({
+  title,
+  body,
+  tone = "neutral",
+}: {
+  title: string;
+  body: string;
+  tone?: "neutral" | "success";
+}) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
-      <h1 className="text-xl font-semibold text-zinc-900">{title}</h1>
-      <p className="mt-2 text-sm text-zinc-600">{body}</p>
+    <div className="min-h-screen bg-white">
+      <RespondHeader />
+      <div className="mx-auto flex max-w-md flex-col items-center justify-center px-6 py-24 text-center">
+        <h1
+          className={`text-xl font-semibold ${tone === "success" ? "text-brand-gold-dark" : "text-brand-navy"}`}
+        >
+          {title}
+        </h1>
+        <p className="mt-2 text-sm text-zinc-600">{body}</p>
+      </div>
     </div>
   );
 }
@@ -88,6 +104,7 @@ export default async function RespondPage({
   if (rater.completed_at) {
     return (
       <CenteredMessage
+        tone="success"
         title="Thank you"
         body={`Your feedback on ${leaderName} has been recorded. Honest feedback is a favour, not a formality — thank you for taking the time.`}
       />
