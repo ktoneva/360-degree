@@ -15,7 +15,7 @@ Your individual answers are not shown to ${leaderName}. Results are reported as 
 Written comments are shown to ${leaderName} in full. Write them as you would want to receive them.`;
 }
 
-export function groupWording(raterGroup: RaterGroup, leaderName: string): string {
+function groupSpecificWording(raterGroup: RaterGroup, leaderName: string): string {
   switch (raterGroup) {
     case "self":
       return `This is your own view, in your own words, before you see anyone else's. Complete it first.
@@ -44,6 +44,21 @@ If you are worried about being identified in written comments, describe the patt
 
 You will see a shorter set of statements, only the ones you are in a position to judge. Your answers are pooled and reported only if at least three people in this group respond.`;
   }
+}
+
+export function groupWording(
+  raterGroup: RaterGroup,
+  leaderName: string,
+  competencyNames: string[],
+): string {
+  const list = competencyNames.map((name, i) => `${i + 1}. ${name}`).join("\n");
+
+  return `${groupSpecificWording(raterGroup, leaderName)}
+
+If you need to stop partway through, your answers so far are saved. You can come back and finish later using the same link.
+
+You'll be asked about:
+${list}`;
 }
 
 export const SAFEGUARDING_WORDING = `Two statements in this section ask about safeguarding practice. They are answered yes / no / not observed and they are not scored.
