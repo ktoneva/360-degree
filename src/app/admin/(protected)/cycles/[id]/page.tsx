@@ -23,17 +23,44 @@ function raterStatus(rater: Rater) {
   return { label: "Not started", date: null };
 }
 
-function buildMailto(rater: Rater, leaderName: string, link: string) {
+const SENDER_SIGNOFF = "Krasi Toneva, CEO at Coach My Future";
+
+function formatInviteDate(dateStr: string) {
+  return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function buildMailto(
+  rater: Rater,
+  leaderName: string,
+  link: string,
+  periodStart: string,
+  periodEnd: string,
+) {
   if (!rater.email) return null;
-  const subject = `Feedback request: ${leaderName}'s leadership review`;
+  const firstName = (rater.full_name ?? "").trim().split(/\s+/)[0] || "there";
+  const subject = `A few honest minutes for ${leaderName}`;
   const body = [
-    `Hi ${rater.full_name ?? ""},`.trim(),
+    `Hi ${firstName},`,
     "",
-    `You've been asked to give feedback on ${leaderName} as part of a leadership development review. This is for their development — it is not a performance appraisal.`,
+    `${leaderName} has asked for honest feedback as part of a leadership development review, and your view is one of the ones that matters most here.`,
     "",
-    `Please complete your questionnaire here: ${link}`,
+    "This is entirely for their development. It is not a performance appraisal, and it does not feed into any pay or capability decision.",
     "",
-    "It takes most people around 15 minutes. Thank you for taking the time.",
+    `Your individual answers are never shown to ${leaderName}. Results are reported as group figures, and only once at least 3 people in your group have responded.`,
+    "",
+    `The more specific you can be, the more useful this is. Rather than "often", think of a moment that shows it. There is also space to name the 2 things that would make the biggest difference if ${leaderName} improved them, and a box under each section to add anything a tick alone cannot capture.`,
+    "",
+    `Your questionnaire is open from ${formatInviteDate(periodStart)} to ${formatInviteDate(periodEnd)}: ${link}`,
+    "",
+    `It takes most people around 15 minutes. Thank you for giving ${leaderName} the honest version rather than the easy one, it is worth more than either of you might expect.`,
+    "",
+    "Many thanks in advance",
+    SENDER_SIGNOFF,
   ].join("\n");
   return `mailto:${rater.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
@@ -158,7 +185,13 @@ export default async function CycleDetailPage({
             {(raters as Rater[] | null)?.map((rater) => {
               const status = raterStatus(rater);
               const link = getRaterLink(rater.token);
-              const mailto = buildMailto(rater, subject?.full_name ?? "the leader", link);
+              const mailto = buildMailto(
+                rater,
+                subject?.full_name ?? "the leader",
+                link,
+                cycle.period_start,
+                cycle.period_end,
+              );
               return (
                 <tr key={rater.id}>
                   <td className="px-4 py-3">
