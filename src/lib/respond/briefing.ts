@@ -63,4 +63,4 @@ ${list}`;
 
 export const SAFEGUARDING_WORDING = `Two statements in this section ask about safeguarding practice. They are answered yes / no / not observed and they are not scored.
 
-This questionnaire is not a route for reporting a safeguarding concern and no one is monitoring it in real time. If you have a concern about a child or about adult conduct, stop and contact your Designated Safeguarding Lead now, or the local authority designated officer if the concern is about a member of staff.`;
+This questionnaire is not a route for reporting a safeguarding concern and no one is monitoring it in real time. If you have a concern about a child or about adult conduct, stop and contact your Designated Safeguarding Lead now.`;

@@ -106,7 +106,7 @@ export default async function RespondPage({
       <CenteredMessage
         tone="success"
         title="Thank you"
-        body={`Your feedback on ${leaderName} has been recorded. Honest feedback is a favour, not a formality — thank you for taking the time.`}
+        body={`Your feedback on ${leaderName} has been recorded. Honest feedback is a favour, not a formality - thank you for taking the time.`}
       />
     );
   }
