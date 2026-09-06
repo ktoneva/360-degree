@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAssignedItems } from "@/lib/respond/assigned-items";
 import { isLinkExpired } from "@/lib/respond/expiry";
 import { checkRateLimit, getClientIp } from "@/lib/respond/rate-limit";
+import { FORCED_CHOICE_PRIORITY_COUNT } from "@/lib/types";
 import type { CommentsValue, CompetencyVariant, RaterGroup, ResponseValue } from "@/lib/types";
 
 const GENERIC_ERROR = "Something went wrong saving that. Please try again.";
@@ -113,7 +114,9 @@ export async function saveForcedChoice(
   token: string,
   itemIds: string[],
 ): Promise<{ error: string | null }> {
-  if (itemIds.length > 2) return { error: "You can only choose 2." };
+  if (itemIds.length > FORCED_CHOICE_PRIORITY_COUNT) {
+    return { error: `You can only choose ${FORCED_CHOICE_PRIORITY_COUNT}.` };
+  }
 
   try {
     const { supabase, rater, error: lookupError } = await getActiveRater(token);
@@ -224,8 +227,8 @@ export async function submitQuestionnaire(
         `${missingCount} statement${missingCount === 1 ? "" : "s"} still need${missingCount === 1 ? "s" : ""} an answer.`,
       );
     }
-    if ((nominationCount ?? 0) !== 2) {
-      problems.push("Choose exactly 2 development priorities.");
+    if ((nominationCount ?? 0) !== FORCED_CHOICE_PRIORITY_COUNT) {
+      problems.push(`Choose exactly ${FORCED_CHOICE_PRIORITY_COUNT} development priorities.`);
     }
 
     if (problems.length > 0) {

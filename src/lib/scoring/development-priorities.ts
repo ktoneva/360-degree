@@ -2,6 +2,10 @@ import { MERGEABLE_GROUPS, type MergeableGroup } from "./types";
 import { groupRatersByGroup } from "./means";
 import type { ScoringDataset } from "./types";
 
+/** How many development priorities a rater must pick for their forced choice
+ * to count at all (v10 of the spec: 3, all required, equally weighted). */
+const REQUIRED_PRIORITY_COUNT = 3;
+
 export type DevelopmentPriorityBreakdown =
   | { mode: "separate"; peer: number; directReport: number; other: number }
   | { mode: "partial_merge"; separate: Partial<Record<MergeableGroup, number>>; allColleagues: number }
@@ -24,8 +28,10 @@ export interface DevelopmentPriorityItemResult {
   managerNominated: boolean;
 }
 
-/** Raters whose forced choice counts at all: exactly 2 distinct nominated
- * items. 0 or 1 is excluded entirely, not partially counted (step 2). */
+/** Raters whose forced choice counts at all: exactly REQUIRED_PRIORITY_COUNT
+ * distinct nominated items. Fewer is excluded entirely, not partially
+ * counted (step 2) — a rater who nominated only 2 of the required 3 before
+ * this changed from 2 to 3 is correctly treated the same as 0 or 1 here. */
 function completeNominationsByRater(nominations: ScoringDataset["nominations"]): Map<string, Set<string>> {
   const byRater = new Map<string, Set<string>>();
   for (const nom of nominations) {
@@ -33,7 +39,7 @@ function completeNominationsByRater(nominations: ScoringDataset["nominations"]):
     byRater.get(nom.raterId)!.add(nom.itemId);
   }
   for (const [raterId, items] of byRater) {
-    if (items.size !== 2) byRater.delete(raterId);
+    if (items.size !== REQUIRED_PRIORITY_COUNT) byRater.delete(raterId);
   }
   return byRater;
 }

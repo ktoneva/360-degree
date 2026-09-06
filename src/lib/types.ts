@@ -18,6 +18,10 @@ export const RATER_GROUP_LABELS: Record<RaterGroup, string> = {
   other: "Others / contributors",
 };
 
+/** How many development priorities a rater must pick for their forced
+ * choice to count at all (v10 of the spec: 3, all required). */
+export const FORCED_CHOICE_PRIORITY_COUNT = 3;
+
 export interface ReviewSubject {
   id: string;
   full_name: string;

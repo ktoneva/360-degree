@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveForcedChoice } from "./actions";
+import { FORCED_CHOICE_PRIORITY_COUNT } from "@/lib/types";
 import type { AssignedItem } from "@/lib/types";
 
 export function ForcedChoice({
@@ -28,7 +29,7 @@ export function ForcedChoice({
     if (selected.includes(itemId)) {
       next = selected.filter((id) => id !== itemId);
     } else {
-      if (selected.length >= 2) return;
+      if (selected.length >= FORCED_CHOICE_PRIORITY_COUNT) return;
       next = [...selected, itemId];
     }
     setSelected(next);
@@ -63,9 +64,12 @@ export function ForcedChoice({
       <div>
         <h2 className="text-lg font-semibold text-brand-navy">Development priorities</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Pick the 2 behaviours that would make the biggest difference if improved.
+          Pick the 3 behaviours that would make the biggest difference if improved. These can be
+          from any of the 9 areas.
         </p>
-        <p className="mt-1 text-sm font-medium text-zinc-700">{selected.length} of 2 chosen</p>
+        <p className="mt-1 text-sm font-medium text-zinc-700">
+          {selected.length} of {FORCED_CHOICE_PRIORITY_COUNT} chosen
+        </p>
       </div>
 
       <div className="space-y-5">
@@ -75,7 +79,7 @@ export function ForcedChoice({
             <div className="space-y-1.5">
               {competencyItems.map((item) => {
                 const isChecked = selected.includes(item.id);
-                const isDisabled = !isChecked && selected.length >= 2;
+                const isDisabled = !isChecked && selected.length >= FORCED_CHOICE_PRIORITY_COUNT;
                 return (
                   <label
                     key={item.id}

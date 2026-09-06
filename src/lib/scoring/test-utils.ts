@@ -4,10 +4,16 @@ import type { RaterGroup, ScoringDataset, ScoringItem, ScoringRater, ScoringResp
  * 7 has one scored item plus the two integrity items (7.5/7.6 pattern). */
 export const ITEM_C1: ScoringItem = { id: "c1i1", competencyNumber: 1, itemNumber: 1, isIntegrityItem: false };
 export const ITEM_C1_B: ScoringItem = { id: "c1i2", competencyNumber: 1, itemNumber: 2, isIntegrityItem: false };
+export const ITEM_C2: ScoringItem = { id: "c2i1", competencyNumber: 2, itemNumber: 1, isIntegrityItem: false };
 export const ITEM_C7: ScoringItem = { id: "c7i1", competencyNumber: 7, itemNumber: 1, isIntegrityItem: false };
 export const ITEM_C7_SAFE_A: ScoringItem = { id: "c7i5", competencyNumber: 7, itemNumber: 5, isIntegrityItem: true };
 export const ITEM_C7_SAFE_B: ScoringItem = { id: "c7i6", competencyNumber: 7, itemNumber: 6, isIntegrityItem: true };
 
+// ITEM_C2 is deliberately not part of DEFAULT_ITEMS -- every other scoring
+// suite builds datasets against the default set without overriding it, so
+// adding a 4th real item here would silently introduce a zero-response item
+// into their results. Tests that need a 4th distinct item pass it via
+// buildDataset({ items: [...] }) explicitly.
 export const DEFAULT_ITEMS: ScoringItem[] = [ITEM_C1, ITEM_C1_B, ITEM_C7, ITEM_C7_SAFE_A, ITEM_C7_SAFE_B];
 
 let raterCounter = 0;

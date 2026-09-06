@@ -7,6 +7,7 @@ import { ForcedChoice } from "./forced-choice";
 import { CommentsSection } from "./comments-section";
 import { generalIntro, groupWording, SAFEGUARDING_WORDING } from "@/lib/respond/briefing";
 import { RespondHeader } from "./respond-header";
+import { FORCED_CHOICE_PRIORITY_COUNT } from "@/lib/types";
 import type { AssignedItem, CommentsValue, RaterGroup, ResponseValue } from "@/lib/types";
 
 type ResponseRow = { item_id: string; scale_value: number | null; not_observed: boolean; integrity_value: string | null };
@@ -230,8 +231,8 @@ export function Questionnaire({
             {isSubmitting ? "Submitting…" : "Submit my feedback"}
           </button>
           <p className="mt-2 text-center text-xs text-zinc-500">
-            {answeredCount} of {total} statements answered &middot; {nominationCount} of 2
-            priorities chosen
+            {answeredCount} of {total} statements answered &middot; {nominationCount} of{" "}
+            {FORCED_CHOICE_PRIORITY_COUNT} priorities chosen
           </p>
         </div>
       </div>

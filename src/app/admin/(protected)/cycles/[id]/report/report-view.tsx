@@ -287,7 +287,7 @@ function DevelopmentPrioritiesSection({ data }: { data: ReportData }) {
   return (
     <Section title="Development priorities (forced choice)">
       <p className="mb-4 text-sm text-zinc-600">
-        Top 10 items by colleague nomination count, from the &ldquo;pick 2 to improve&rdquo;
+        Top 10 items by colleague nomination count, from the &ldquo;pick 3 to improve&rdquo;
         question. Self and manager are reference flags, not part of the ranking.
       </p>
       {data.developmentPriorities.length === 0 ? (
