@@ -1,9 +1,10 @@
 import { createClient } from "./server";
 
 /**
- * Defense-in-depth check inside every admin server action, independent of
- * the middleware redirect — a server action is its own POST endpoint, and
- * this must never rely solely on the page-level gate holding up.
+ * Auth check inside every admin server action. A Server Action is its own
+ * POST endpoint, invoked directly by the client — it is not protected by
+ * the (protected) layout's render-time redirect, so it needs this check
+ * independently rather than assuming the page around it was gated.
  */
 export async function requireAdminUser(): Promise<{ error: string | null }> {
   try {
