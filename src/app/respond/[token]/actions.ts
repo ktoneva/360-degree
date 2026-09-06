@@ -4,12 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAssignedItems } from "@/lib/respond/assigned-items";
 import { isLinkExpired } from "@/lib/respond/expiry";
+import { checkRateLimit, getClientIp } from "@/lib/respond/rate-limit";
 import type { CommentsValue, CompetencyVariant, RaterGroup, ResponseValue } from "@/lib/types";
 
 const GENERIC_ERROR = "Something went wrong saving that. Please try again.";
 const INVALID_LINK_ERROR = "This link isn't valid.";
 const ALREADY_SUBMITTED_ERROR = "This questionnaire has already been submitted.";
 const LINK_EXPIRED_ERROR = "This link has expired. Please contact whoever invited you.";
+const RATE_LIMITED_ERROR = "Too many requests. Please wait a few minutes and try again.";
 
 interface ActiveRater {
   id: string;
@@ -31,6 +33,12 @@ async function getActiveRater(
   token: string,
 ): Promise<{ supabase: ReturnType<typeof createAdminClient>; rater: ActiveRater | null; error: string | null }> {
   try {
+    const ip = await getClientIp();
+    const withinLimit = await checkRateLimit(`respond_write:${ip}`, 300, 600);
+    if (!withinLimit) {
+      return { supabase: null as unknown as ReturnType<typeof createAdminClient>, rater: null, error: RATE_LIMITED_ERROR };
+    }
+
     const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("raters")

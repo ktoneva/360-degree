@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getAssignedItems } from "@/lib/respond/assigned-items";
 import { isLinkExpired } from "@/lib/respond/expiry";
+import { checkRateLimit, getClientIp } from "@/lib/respond/rate-limit";
 import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import { Questionnaire } from "./questionnaire";
 
@@ -27,6 +28,18 @@ export default async function RespondPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
+
+  const ip = await getClientIp();
+  const withinLimit = await checkRateLimit(`respond_page:${ip}`, 60, 600);
+  if (!withinLimit) {
+    return (
+      <CenteredMessage
+        title="Too many requests"
+        body="You've made too many requests in a short time. Please wait a few minutes and try again."
+      />
+    );
+  }
+
   const supabase = createAdminClient();
 
   const { data: rater, error: raterError } = await supabase
