@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Refreshes the Supabase session cookie so it doesn't expire mid-visit.
+ * This does NOT enforce access control — access control for /admin lives in
+ * src/app/admin/(protected)/layout.tsx as a direct Server Component check,
+ * since the Proxy convention was found not to reliably run for every
+ * request in this Next.js version (confirmed both locally and on a live
+ * Vercel preview deployment).
+ */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -25,8 +33,7 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refreshes the auth token if needed. Do not add logic between
-  // createServerClient and this call.
+  // Do not add logic between createServerClient and this call.
   await supabase.auth.getUser();
 
   return supabaseResponse;
