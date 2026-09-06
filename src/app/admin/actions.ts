@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { requireAdminUser } from "@/lib/supabase/require-admin-user";
 import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import type { ActionState } from "@/lib/action-state";
 
@@ -12,6 +13,11 @@ export async function createReviewCycle(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  // Defense-in-depth: a Server Action is its own POST endpoint and must not
+  // rely solely on the middleware redirect holding up.
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError, successCount: 0 };
+
   const leaderName = String(formData.get("leader_name") ?? "").trim();
   const roleTitle = String(formData.get("role_title") ?? "").trim() || null;
   const cycleName = String(formData.get("cycle_name") ?? "").trim();
@@ -87,6 +93,9 @@ export async function addRater(
   if (!raterGroup) {
     return { error: "Choose a rater group.", successCount: 0 };
   }
+
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError, successCount: 0 };
 
   try {
     const supabase = createAdminClient();

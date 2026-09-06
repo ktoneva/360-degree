@@ -1,6 +1,6 @@
 # 360° feedback for educational leaders
 
-A 360-degree feedback platform for headteachers, deputies, and business managers. Consultants run review cycles from an admin console; raters answer a questionnaire behind a private, unguessable link; a scoring engine turns the responses into a full leader report.
+A 360-degree feedback platform for headteachers, deputies, assistant headteachers, middle leaders, and operational and business leaders. Consultants run review cycles from an admin console; raters answer a questionnaire behind a private, unguessable link; a scoring engine turns the responses into a full leader report.
 
 - **App:** Next.js (App Router) + TypeScript + Tailwind
 - **Data:** Supabase (Postgres), accessed via a service-role key — there's no end-user auth yet; access is controlled by knowledge of a rater's token or by reaching the admin routes directly

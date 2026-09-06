@@ -25,9 +25,30 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  // Refreshes the auth token if needed. Do not add logic between
-  // createServerClient and this call.
-  await supabase.auth.getUser();
+  // Never trust a locally-decoded JWT here — getUser() re-validates against
+  // Supabase itself. Do not add logic between createServerClient and this
+  // call (setAll must run for every cookies mutation Supabase makes).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+  const isAdminRoute = pathname.startsWith("/admin");
+  const isLoginRoute = pathname === "/admin/login";
+
+  if (isAdminRoute && !isLoginRoute && !user) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/admin/login";
+    loginUrl.search = `?redirect=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (isLoginRoute && user) {
+    const adminUrl = request.nextUrl.clone();
+    adminUrl.pathname = "/admin";
+    adminUrl.search = "";
+    return NextResponse.redirect(adminUrl);
+  }
 
   return supabaseResponse;
 }
