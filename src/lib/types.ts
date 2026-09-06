@@ -1,6 +1,28 @@
 export type RaterGroup = "self" | "manager" | "peer" | "direct_report" | "other";
 export type CompetencyVariant = "standard" | "ops";
 export type CycleStatus = "draft" | "open" | "closed";
+export type LeaderLevel =
+  | "headteacher"
+  | "deputy_head"
+  | "assistant_head"
+  | "middle_leader"
+  | "operational_business_leader";
+
+export const LEADER_LEVELS: LeaderLevel[] = [
+  "headteacher",
+  "deputy_head",
+  "assistant_head",
+  "middle_leader",
+  "operational_business_leader",
+];
+
+export const LEADER_LEVEL_LABELS: Record<LeaderLevel, string> = {
+  headteacher: "Headteacher",
+  deputy_head: "Deputy Head",
+  assistant_head: "Assistant Head",
+  middle_leader: "Middle Leader",
+  operational_business_leader: "Operational and Business Leader",
+};
 
 export const RATER_GROUPS: RaterGroup[] = [
   "self",
@@ -28,9 +50,18 @@ export interface ReviewSubject {
   role_title: string | null;
 }
 
+export interface Organisation {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+}
+
 export interface ReviewCycle {
   id: string;
   review_subject_id: string;
+  organisation_id: string | null;
+  level: LeaderLevel | null;
   name: string;
   period_start: string;
   period_end: string;

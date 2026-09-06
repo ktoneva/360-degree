@@ -2,11 +2,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRaterLink } from "@/lib/app-url";
-import { RATER_GROUPS, RATER_GROUP_LABELS, type Rater, type RaterGroup } from "@/lib/types";
+import {
+  LEADER_LEVEL_LABELS,
+  RATER_GROUPS,
+  RATER_GROUP_LABELS,
+  type LeaderLevel,
+  type Rater,
+  type RaterGroup,
+} from "@/lib/types";
 import { AddRaterForm } from "./add-rater-form";
 import { CopyLinkButton } from "./copy-link-button";
 import { ReopenRaterButton } from "./reopen-rater-button";
 import { LinkExpiryEditor } from "./link-expiry-editor";
+import { CycleStatusControl } from "./cycle-status-control";
 
 // Explicit, since Supabase-js calls aren't native fetch() and Next's static
 // analysis can't otherwise tell this page depends on live data.
@@ -76,7 +84,7 @@ export default async function CycleDetailPage({
   const { data: cycle, error: cycleError } = await supabase
     .from("review_cycles")
     .select(
-      "id, name, period_start, period_end, status, competency_9_variant, link_expiry_days, review_subjects(full_name, role_title)",
+      "id, name, period_start, period_end, status, competency_9_variant, link_expiry_days, level, organisations(name), review_subjects(full_name, role_title)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -91,6 +99,9 @@ export default async function CycleDetailPage({
   const subject = Array.isArray(cycle.review_subjects)
     ? cycle.review_subjects[0]
     : cycle.review_subjects;
+  const organisation = Array.isArray(cycle.organisations)
+    ? cycle.organisations[0]
+    : cycle.organisations;
 
   const { data: raters, error: ratersError } = await supabase
     .from("raters")
@@ -125,10 +136,17 @@ export default async function CycleDetailPage({
             {cycle.name} &middot; {cycle.period_start} to {cycle.period_end}
           </p>
           <p className="mt-1 text-sm text-zinc-500">
+            {organisation?.name ?? "No organisation set"}
+            {cycle.level ? ` · ${LEADER_LEVEL_LABELS[cycle.level as LeaderLevel]}` : ""}
+          </p>
+          <p className="mt-1 text-sm text-zinc-500">
             Competency 9: {COMPETENCY_9_LABELS[cycle.competency_9_variant]}
           </p>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-3">
             <LinkExpiryEditor cycleId={id} initialDays={cycle.link_expiry_days} />
+          </div>
+          <div className="mt-2">
+            <CycleStatusControl cycleId={id} status={cycle.status} />
           </div>
         </div>
         <Link

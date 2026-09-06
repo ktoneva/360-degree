@@ -8,3 +8,4 @@ export * from "./safeguarding";
 export * from "./highest-lowest-items";
 export * from "./item-appendix";
 export * from "./response-rate";
+export * from "./org-overview";

@@ -1,10 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { createReviewCycle } from "@/app/admin/actions";
 import { initialActionState } from "@/lib/action-state";
+import { LEADER_LEVELS, LEADER_LEVEL_LABELS } from "@/lib/types";
 
-export function NewCycleForm() {
+export function NewCycleForm({
+  organisations,
+}: {
+  organisations: { id: string; name: string }[];
+}) {
   const [state, formAction, pending] = useActionState(
     createReviewCycle,
     initialActionState,
@@ -38,6 +44,60 @@ export function NewCycleForm() {
           className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none"
           placeholder="Headteacher"
         />
+      </div>
+
+      <div>
+        <label htmlFor="organisation_id" className="block text-sm font-medium text-zinc-700">
+          Organisation
+        </label>
+        {organisations.length === 0 ? (
+          <p className="mt-1 text-sm text-zinc-500">
+            No organisations yet.{" "}
+            <Link href="/admin/organisations" className="underline hover:text-zinc-700">
+              Add one first
+            </Link>
+            .
+          </p>
+        ) : (
+          <select
+            id="organisation_id"
+            name="organisation_id"
+            required
+            defaultValue=""
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none"
+          >
+            <option value="" disabled>
+              Choose…
+            </option>
+            {organisations.map((org) => (
+              <option key={org.id} value={org.id}>
+                {org.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div>
+        <label htmlFor="level" className="block text-sm font-medium text-zinc-700">
+          Leader&apos;s level
+        </label>
+        <select
+          id="level"
+          name="level"
+          required
+          defaultValue=""
+          className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-zinc-500 focus:outline-none"
+        >
+          <option value="" disabled>
+            Choose…
+          </option>
+          {LEADER_LEVELS.map((level) => (
+            <option key={level} value={level}>
+              {LEADER_LEVEL_LABELS[level]}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>

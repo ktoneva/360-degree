@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminUser } from "@/lib/supabase/require-admin-user";
-import type { CompetencyVariant, RaterGroup } from "@/lib/types";
+import { LEADER_LEVELS } from "@/lib/types";
+import type { CompetencyVariant, CycleStatus, LeaderLevel, RaterGroup } from "@/lib/types";
 import type { ActionState } from "@/lib/action-state";
 
 const UNEXPECTED_ERROR = "Something went wrong. Please try again.";
@@ -20,6 +21,8 @@ export async function createReviewCycle(
 
   const leaderName = String(formData.get("leader_name") ?? "").trim();
   const roleTitle = String(formData.get("role_title") ?? "").trim() || null;
+  const organisationId = String(formData.get("organisation_id") ?? "").trim();
+  const level = String(formData.get("level") ?? "").trim() as LeaderLevel | "";
   const cycleName = String(formData.get("cycle_name") ?? "").trim();
   const periodStart = String(formData.get("period_start") ?? "");
   const periodEnd = String(formData.get("period_end") ?? "");
@@ -31,6 +34,12 @@ export async function createReviewCycle(
 
   if (!leaderName || !cycleName || !periodStart || !periodEnd) {
     return { error: "Leader name, cycle name, and both dates are required.", successCount: 0 };
+  }
+  if (!organisationId) {
+    return { error: "Choose an organisation.", successCount: 0 };
+  }
+  if (!level || !LEADER_LEVELS.includes(level)) {
+    return { error: "Choose the leader's level.", successCount: 0 };
   }
   if (periodEnd < periodStart) {
     return { error: "End date can't be before the start date.", successCount: 0 };
@@ -68,6 +77,8 @@ export async function createReviewCycle(
       .from("review_cycles")
       .insert({
         review_subject_id: subjectId,
+        organisation_id: organisationId,
+        level,
         name: cycleName,
         period_start: periodStart,
         period_end: periodEnd,
@@ -151,6 +162,66 @@ export async function updateLinkExpiry(
       .update({ link_expiry_days: days })
       .eq("id", cycleId);
 
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}
+
+export async function createOrganisation(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError, successCount: 0 };
+
+  const name = String(formData.get("name") ?? "").trim();
+  const contactName = String(formData.get("contact_name") ?? "").trim() || null;
+  const contactEmail = String(formData.get("contact_email") ?? "").trim() || null;
+
+  if (!name) {
+    return { error: "Organisation name is required.", successCount: 0 };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("organisations").insert({
+      name,
+      contact_name: contactName,
+      contact_email: contactEmail,
+    });
+    if (error) return { error: error.message, successCount: 0 };
+
+    revalidatePath("/admin/organisations");
+    revalidatePath("/admin/new");
+    return { error: null, successCount: _prevState.successCount + 1 };
+  } catch {
+    return { error: UNEXPECTED_ERROR, successCount: 0 };
+  }
+}
+
+const CLOSABLE_STATUSES: CycleStatus[] = ["draft", "open", "closed"];
+
+export async function setCycleStatus(
+  cycleId: string,
+  status: CycleStatus,
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  if (!CLOSABLE_STATUSES.includes(status)) {
+    return { error: "Not a valid status." };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("review_cycles")
+      .update({ status })
+      .eq("id", cycleId);
     if (error) return { error: error.message };
 
     revalidatePath(`/admin/cycles/${cycleId}`);
