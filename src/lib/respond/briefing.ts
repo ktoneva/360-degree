@@ -5,10 +5,10 @@ import type { RaterGroup } from "@/lib/types";
  * [NAME] is filled in with the leader's name; [N] with this rater's item count.
  */
 
-export function generalIntro(leaderName: string, itemCount: number): string {
+export function generalIntro(leaderName: string): string {
   return `You have been asked to give feedback on ${leaderName} as part of a leadership development review. This is for their development. It is not a performance appraisal and it does not feed into any pay or capability decision.
 
-There are ${itemCount} statements. Most people take about 15 minutes. Answer on how often you see the behaviour, not on how you think they intend to behave. If you have not seen something, choose 'Not able to comment'. That is a real answer and it is more useful than a guess.
+Most people take about 20-30 minutes. Answer on how often you see the behaviour, not on how you think they intend to behave. If you have not seen something, choose 'Not able to comment'. That is a real answer and it is more useful than a guess.
 
 Your individual answers are not shown to ${leaderName}. Results are reported as group averages and only where at least three people in your group have responded. Your manager's ratings are reported separately and they know that.
 

@@ -93,7 +93,7 @@ export function Questionnaire({
         <div className="mx-auto flex max-w-md flex-col justify-center px-6 py-14">
           <h1 className="text-xl font-semibold text-brand-navy">Leadership feedback</h1>
           <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-700">
-            {generalIntro(leaderName, items.length)}
+            {generalIntro(leaderName)}
           </p>
           <button
             type="button"
