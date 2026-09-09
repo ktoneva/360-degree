@@ -31,7 +31,7 @@ function raterStatus(rater: Rater) {
   return { label: "Not started", date: null };
 }
 
-const SENDER_SIGNOFF = "Krasi Toneva, CEO at Coach My Future";
+const SENDER_SIGNOFF = "Krasi Toneva, Coach My Future";
 
 function formatInviteDate(dateStr: string) {
   return new Date(`${dateStr}T00:00:00Z`).toLocaleDateString("en-GB", {
@@ -45,27 +45,29 @@ function formatInviteDate(dateStr: string) {
 function buildMailto(
   rater: Rater,
   leaderName: string,
+  organisationName: string,
   link: string,
   periodStart: string,
   periodEnd: string,
 ) {
   if (!rater.email) return null;
   const firstName = (rater.full_name ?? "").trim().split(/\s+/)[0] || "there";
-  const subject = `A few honest minutes for ${leaderName}`;
+  const closeDate = formatInviteDate(periodEnd);
+  const subject = `360 Degree feedback for ${leaderName} - complete by ${closeDate}`;
   const body = [
     `Hi ${firstName},`,
     "",
-    `${leaderName} has asked for honest feedback as part of a leadership development review, and your view is one of the ones that matters most here.`,
+    `Welcome to ${organisationName} 360 feedback.`,
     "",
-    "This is entirely for their development. It is not a performance appraisal, and it does not feed into any pay or capability decision.",
+    `${leaderName} has asked for honest feedback as part of their leadership journey, and your view is one of the ones that matters most here.`,
+    "",
+    `This is entirely for their development and for the ${organisationName} SLT development.`,
     "",
     `Your individual answers are never shown to ${leaderName}. Results are reported as group figures, and only once at least 3 people in your group have responded.`,
     "",
-    `The more specific you can be, the more useful this is. Rather than "often", think of a moment that shows it. There is also space to name the 2 things that would make the biggest difference if ${leaderName} improved them, and a box under each section to add anything a tick alone cannot capture.`,
+    `Your questionnaire is open from ${formatInviteDate(periodStart)} to ${closeDate}: ${link}`,
     "",
-    `Your questionnaire is open from ${formatInviteDate(periodStart)} to ${formatInviteDate(periodEnd)}: ${link}`,
-    "",
-    `It takes most people around 15 minutes. Thank you for giving ${leaderName} the honest version rather than the easy one, it is worth more than either of you might expect.`,
+    `It takes most people around 15-30 minutes. Thank you for giving ${leaderName} the honest version rather than the easy one, it is worth more than either of you might expect.`,
     "",
     "Many thanks in advance",
     SENDER_SIGNOFF,
@@ -206,6 +208,7 @@ export default async function CycleDetailPage({
               const mailto = buildMailto(
                 rater,
                 subject?.full_name ?? "the leader",
+                organisation?.name ?? "the organisation",
                 link,
                 cycle.period_start,
                 cycle.period_end,
