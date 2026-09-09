@@ -258,3 +258,35 @@ export async function reopenRater(
     return { error: UNEXPECTED_ERROR };
   }
 }
+
+const NOTE_CARDS = ["strengths", "gaps", "stretch", "development"] as const;
+
+export async function saveTeamReportNote(
+  organisationId: string,
+  level: LeaderLevel,
+  card: (typeof NOTE_CARDS)[number],
+  position: 1 | 2,
+  who: string,
+  what: string,
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  if (!NOTE_CARDS.includes(card) || (position !== 1 && position !== 2)) {
+    return { error: "Not a valid card or position." };
+  }
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("team_report_notes").upsert(
+      { organisation_id: organisationId, level, card, position, who: who.trim(), what: what.trim() },
+      { onConflict: "organisation_id,level,card,position" },
+    );
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/organisations/${organisationId}/team-report`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}

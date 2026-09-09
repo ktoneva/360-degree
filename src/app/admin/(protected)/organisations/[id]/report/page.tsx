@@ -29,8 +29,18 @@ export default async function OrgReportPage({
       <Link href="/admin/organisations" className="text-sm text-zinc-500 hover:text-zinc-700">
         &larr; Back to organisations
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold text-zinc-900">{data.organisationName}</h1>
-      <p className="mt-1 text-sm text-zinc-500">Organisation-wide competency overview</p>
+      <div className="mt-2 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">{data.organisationName}</h1>
+          <p className="mt-1 text-sm text-zinc-500">Organisation-wide competency overview</p>
+        </div>
+        <Link
+          href={`/admin/organisations/${id}/team-report${level ? `?level=${level}` : ""}`}
+          className="shrink-0 rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          Team summary report
+        </Link>
+      </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link

@@ -7,3 +7,4 @@ export * from "./development-priorities";
 export * from "./highest-lowest-items";
 export * from "./org-overview";
 export * from "./competency-detail";
+export * from "./team-report";
