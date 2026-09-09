@@ -144,6 +144,7 @@ export default async function RespondPage({
     { data: responses, error: responsesError },
     { data: nominations, error: nominationsError },
     { data: comments, error: commentsError },
+    { data: competencyComments, error: competencyCommentsError },
   ] = await Promise.all([
     supabase
       .from("responses")
@@ -155,9 +156,13 @@ export default async function RespondPage({
       .select("continue_text, start_text, stop_text")
       .eq("rater_id", rater.id)
       .maybeSingle(),
+    supabase
+      .from("competency_comments")
+      .select("competency_number, comment_text")
+      .eq("rater_id", rater.id),
   ]);
 
-  if (responsesError || nominationsError || commentsError) {
+  if (responsesError || nominationsError || commentsError || competencyCommentsError) {
     return <CenteredMessage title="Something went wrong" body={TRY_AGAIN_MESSAGE} />;
   }
 
@@ -174,6 +179,9 @@ export default async function RespondPage({
         start_text: comments?.start_text ?? "",
         stop_text: comments?.stop_text ?? "",
       }}
+      initialCompetencyComments={Object.fromEntries(
+        (competencyComments ?? []).map((c) => [c.competency_number as number, c.comment_text as string]),
+      )}
     />
   );
 }

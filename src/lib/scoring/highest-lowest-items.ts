@@ -9,9 +9,9 @@ export interface RankedItemMean {
 }
 
 export interface HighestLowestItems {
-  /** Up to 10 items, highest all-others mean first. */
+  /** Up to 5 items, highest all-others mean first. */
   highest: RankedItemMean[];
-  /** Up to 10 items, lowest all-others mean first. */
+  /** Up to 5 items, lowest all-others mean first. */
   lowest: RankedItemMean[];
 }
 
@@ -31,7 +31,7 @@ function strip({ itemId, competencyNumber, itemNumber, allOthersMean }: RankedIn
 }
 
 /**
- * The ten highest and ten lowest items across the whole bank by all-others
+ * The five highest and five lowest items across the whole bank by all-others
  * mean (report template section 7). Uses the same item-level all-others
  * figure as blind spots/hidden strengths — including its n>=3 merge rule —
  * since "all-others mean" is a single consistent concept throughout the
@@ -61,12 +61,12 @@ export function computeHighestLowestItems(dataset: ScoringDataset): HighestLowes
 
   const highest = [...ranked]
     .sort((a, b) => (b.rawMean !== a.rawMean ? b.rawMean - a.rawMean : tieBreak(a, b)))
-    .slice(0, 10)
+    .slice(0, 5)
     .map(strip);
 
   const lowest = [...ranked]
     .sort((a, b) => (a.rawMean !== b.rawMean ? a.rawMean - b.rawMean : tieBreak(a, b)))
-    .slice(0, 10)
+    .slice(0, 5)
     .map(strip);
 
   return { highest, lowest };

@@ -5,7 +5,8 @@ import { submitQuestionnaire } from "./actions";
 import { ItemQuestion } from "./item-question";
 import { ForcedChoice } from "./forced-choice";
 import { CommentsSection } from "./comments-section";
-import { generalIntro, groupWording, SAFEGUARDING_WORDING } from "@/lib/respond/briefing";
+import { CompetencyCommentBox } from "./competency-comment-box";
+import { generalIntro, groupWording } from "@/lib/respond/briefing";
 import { RespondHeader } from "./respond-header";
 import { FORCED_CHOICE_PRIORITY_COUNT } from "@/lib/types";
 import type { AssignedItem, CommentsValue, RaterGroup, ResponseValue } from "@/lib/types";
@@ -22,6 +23,7 @@ export function Questionnaire({
   initialResponses,
   initialNominationIds,
   initialComments,
+  initialCompetencyComments,
 }: {
   token: string;
   leaderName: string;
@@ -30,6 +32,7 @@ export function Questionnaire({
   initialResponses: ResponseRow[];
   initialNominationIds: string[];
   initialComments: CommentsValue;
+  initialCompetencyComments: Record<number, string>;
 }) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(
@@ -168,12 +171,6 @@ export function Questionnaire({
                 {competencyNumber}. {group.name}
               </h2>
 
-              {competencyNumber === 7 && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  <p className="whitespace-pre-line">{SAFEGUARDING_WORDING}</p>
-                </div>
-              )}
-
               <div className="space-y-3">
                 {scoredItems.map((item) => (
                   <ItemQuestion
@@ -205,6 +202,12 @@ export function Questionnaire({
                   </div>
                 </div>
               )}
+
+              <CompetencyCommentBox
+                token={token}
+                competencyNumber={competencyNumber}
+                initialValue={initialCompetencyComments[competencyNumber] ?? ""}
+              />
             </section>
           );
         })}

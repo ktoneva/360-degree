@@ -2,29 +2,57 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import {
   computeBlindSpots,
-  computeCompetencyOverview,
+  computeCompetencyDetailTables,
   computeDevelopmentPriorities,
   computeHiddenStrengths,
   computeHighestLowestItems,
-  computeItemLevelAppendix,
-  computeRaterGroupComparison,
-  computeResponseRates,
-  computeSafeguardingCounts,
+  type CompetencyDetailItemRow,
+  type CompetencySummaryRow,
+  type DevelopmentPriorityItemResult,
+  type GapItemResult,
+  type RankedItemMean,
   type ScoringDataset,
 } from "@/lib/scoring";
 import { getCycleItems, type CycleItem } from "./get-cycle-items";
-import type { ReportData } from "./types";
 
-/** Returns null when the cycle doesn't exist, so the caller can render a 404
- * instead of a generic crash. Any other failure still throws, to be caught
- * by the nearest error.tsx boundary. */
-export async function buildReportData(cycleId: string): Promise<ReportData | null> {
+export interface ReportCompetencyTable {
+  competencyNumber: number;
+  competencyName: string;
+  summary: CompetencySummaryRow;
+  items: (CompetencyDetailItemRow & { behaviourText: string })[];
+}
+
+export interface IndividualReportData {
+  leaderName: string;
+  roleTitle: string | null;
+  organisationName: string | null;
+  /** ISO date string, or null if the cycle hasn't been marked complete --
+   * the caller decides whether that means "not ready to report" at all. */
+  completedAt: string | null;
+  competencyTables: ReportCompetencyTable[];
+  blindSpots: (GapItemResult & { behaviourText: string; competencyName: string })[];
+  hiddenStrengths: (GapItemResult & { behaviourText: string; competencyName: string })[];
+  highestLowest: {
+    highest: (RankedItemMean & { behaviourText: string; competencyName: string })[];
+    lowest: (RankedItemMean & { behaviourText: string; competencyName: string })[];
+  };
+  developmentPriorities: (DevelopmentPriorityItemResult & { behaviourText: string; competencyName: string })[];
+  /** One entry per rater who left a per-competency comment -- shown as
+   * submitted, not merged across raters. */
+  competencyComments: { competencyNumber: number; competencyName: string; text: string }[];
+  overallComments: { continueText: string | null; startText: string | null; stopText: string | null }[];
+}
+
+/** Returns null when the cycle doesn't exist, so the caller can 404 instead
+ * of rendering a broken report. Does not itself check completion status --
+ * the caller decides whether an incomplete cycle should even reach here. */
+export async function buildIndividualReportData(cycleId: string): Promise<IndividualReportData | null> {
   const supabase = createAdminClient();
 
   const { data: cycle, error: cycleError } = await supabase
     .from("review_cycles")
     .select(
-      "name, period_start, period_end, competency_9_variant, review_subjects(full_name, role_title)",
+      "competency_9_variant, completed_at, review_subjects(full_name, role_title), organisations(name)",
     )
     .eq("id", cycleId)
     .maybeSingle();
@@ -32,14 +60,17 @@ export async function buildReportData(cycleId: string): Promise<ReportData | nul
   if (!cycle) return null;
 
   const subject = Array.isArray(cycle.review_subjects) ? cycle.review_subjects[0] : cycle.review_subjects;
+  const organisation = Array.isArray(cycle.organisations) ? cycle.organisations[0] : cycle.organisations;
   const competency9Variant = cycle.competency_9_variant as CompetencyVariant;
 
   const items = await getCycleItems(supabase, competency9Variant);
   const itemMeta = new Map(items.map((i) => [i.id, i]));
+  const competencyNameByNumber = new Map(items.map((i) => [i.competencyNumber, i.competencyName]));
 
-  const [{ data: raters, error: ratersError }] = await Promise.all([
-    supabase.from("raters").select("id, rater_group, completed_at").eq("review_cycle_id", cycleId),
-  ]);
+  const { data: raters, error: ratersError } = await supabase
+    .from("raters")
+    .select("id, rater_group")
+    .eq("review_cycle_id", cycleId);
   if (ratersError) throw new Error(ratersError.message);
 
   const raterIds = (raters ?? []).map((r) => r.id as string);
@@ -48,28 +79,25 @@ export async function buildReportData(cycleId: string): Promise<ReportData | nul
     { data: responses, error: responsesError },
     { data: nominations, error: nominationsError },
     { data: comments, error: commentsError },
+    { data: competencyCommentRows, error: competencyCommentsError },
   ] = await Promise.all([
     raterIds.length === 0
       ? { data: [], error: null }
-      : supabase
-          .from("responses")
-          .select("rater_id, item_id, scale_value, integrity_value")
-          .in("rater_id", raterIds),
+      : supabase.from("responses").select("rater_id, item_id, scale_value, integrity_value").in("rater_id", raterIds),
     raterIds.length === 0
       ? { data: [], error: null }
       : supabase.from("forced_choice_nominations").select("rater_id, item_id").in("rater_id", raterIds),
     raterIds.length === 0
       ? { data: [], error: null }
-      : supabase
-          .from("comments")
-          .select("rater_id, continue_text, start_text, stop_text")
-          .in("rater_id", raterIds),
+      : supabase.from("comments").select("continue_text, start_text, stop_text").in("rater_id", raterIds),
+    raterIds.length === 0
+      ? { data: [], error: null }
+      : supabase.from("competency_comments").select("competency_number, comment_text").in("rater_id", raterIds),
   ]);
   if (responsesError) throw new Error(responsesError.message);
   if (nominationsError) throw new Error(nominationsError.message);
   if (commentsError) throw new Error(commentsError.message);
-
-  const raterGroupById = new Map((raters ?? []).map((r) => [r.id as string, r.rater_group as RaterGroup]));
+  if (competencyCommentsError) throw new Error(competencyCommentsError.message);
 
   const dataset: ScoringDataset = {
     items: items.map((i) => ({
@@ -97,31 +125,16 @@ export async function buildReportData(cycleId: string): Promise<ReportData | nul
     return m;
   }
 
-  const competencyNameByNumber = new Map(items.map((i) => [i.competencyNumber, i.competencyName]));
-
   return {
     leaderName: subject?.full_name ?? "Unknown leader",
     roleTitle: subject?.role_title ?? null,
-    cycleName: cycle.name,
-    periodStart: cycle.period_start,
-    periodEnd: cycle.period_end,
-    competency9Variant,
+    organisationName: organisation?.name ?? null,
+    completedAt: cycle.completed_at,
 
-    responseRates: computeResponseRates(
-      (raters ?? []).map((r) => ({
-        group: r.rater_group as RaterGroup,
-        completed: r.completed_at !== null,
-      })),
-    ),
-
-    competencyOverview: computeCompetencyOverview(dataset).map((row) => ({
-      ...row,
-      competencyName: competencyNameByNumber.get(row.competencyNumber) ?? "",
-    })),
-
-    raterGroupComparison: computeRaterGroupComparison(dataset).map((row) => ({
-      ...row,
-      competencyName: competencyNameByNumber.get(row.competencyNumber) ?? "",
+    competencyTables: computeCompetencyDetailTables(dataset).map((table) => ({
+      ...table,
+      competencyName: competencyNameByNumber.get(table.competencyNumber) ?? "",
+      items: table.items.map((item) => ({ ...item, behaviourText: meta(item.itemId).behaviourText })),
     })),
 
     blindSpots: computeBlindSpots(dataset).map((row) => ({
@@ -136,7 +149,7 @@ export async function buildReportData(cycleId: string): Promise<ReportData | nul
       competencyName: meta(row.itemId).competencyName,
     })),
 
-    highestLowestItems: (() => {
+    highestLowest: (() => {
       const { highest, lowest } = computeHighestLowestItems(dataset);
       const enrich = (row: (typeof highest)[number]) => ({
         ...row,
@@ -152,21 +165,16 @@ export async function buildReportData(cycleId: string): Promise<ReportData | nul
       competencyName: meta(row.itemId).competencyName,
     })),
 
-    itemAppendix: computeItemLevelAppendix(dataset).map((row) => ({
-      ...row,
-      behaviourText: meta(row.itemId).behaviourText,
-      competencyName: meta(row.itemId).competencyName,
-    })),
-
-    safeguarding: computeSafeguardingCounts(dataset).map((row) => ({
-      ...row,
-      behaviourText: meta(row.itemId).behaviourText,
-    })),
-
-    comments: (comments ?? [])
+    competencyComments: (competencyCommentRows ?? [])
       .map((c) => ({
-        raterId: c.rater_id as string,
-        group: raterGroupById.get(c.rater_id as string) ?? "other",
+        competencyNumber: c.competency_number as number,
+        competencyName: competencyNameByNumber.get(c.competency_number as number) ?? "",
+        text: c.comment_text as string,
+      }))
+      .sort((a, b) => a.competencyNumber - b.competencyNumber),
+
+    overallComments: (comments ?? [])
+      .map((c) => ({
         continueText: c.continue_text as string | null,
         startText: c.start_text as string | null,
         stopText: c.stop_text as string | null,

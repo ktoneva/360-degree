@@ -8,9 +8,8 @@ const SCALE_OPTIONS = [
   { value: 1, label: "Almost never" },
   { value: 2, label: "Rarely" },
   { value: 3, label: "Sometimes" },
-  { value: 4, label: "Often" },
-  { value: 5, label: "Usually" },
-  { value: 6, label: "Almost always" },
+  { value: 4, label: "Usually" },
+  { value: 5, label: "Almost always" },
 ];
 
 const INTEGRITY_OPTIONS: { value: IntegrityValue; label: string }[] = [

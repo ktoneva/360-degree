@@ -147,6 +147,40 @@ export async function saveForcedChoice(
   }
 }
 
+export async function saveCompetencyComment(
+  token: string,
+  competencyNumber: number,
+  text: string,
+): Promise<{ error: string | null }> {
+  try {
+    const { supabase, rater, error: lookupError } = await getActiveRater(token);
+    if (lookupError) return { error: lookupError };
+    if (!rater) return { error: INVALID_LINK_ERROR };
+    const guardError = checkRaterUsable(rater);
+    if (guardError) return { error: guardError };
+
+    const trimmed = text.trim();
+    if (!trimmed) {
+      const { error } = await supabase
+        .from("competency_comments")
+        .delete()
+        .eq("rater_id", rater.id)
+        .eq("competency_number", competencyNumber);
+      if (error) return { error: GENERIC_ERROR };
+      return { error: null };
+    }
+
+    const { error } = await supabase.from("competency_comments").upsert(
+      { rater_id: rater.id, competency_number: competencyNumber, comment_text: trimmed },
+      { onConflict: "rater_id,competency_number" },
+    );
+    if (error) return { error: GENERIC_ERROR };
+    return { error: null };
+  } catch {
+    return { error: GENERIC_ERROR };
+  }
+}
+
 export async function saveComments(
   token: string,
   values: CommentsValue,

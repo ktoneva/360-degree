@@ -1,490 +1,496 @@
-import { RATER_GROUPS, RATER_GROUP_LABELS, type RaterGroup } from "@/lib/types";
-import { SAFEGUARDING_WORDING } from "@/lib/respond/briefing";
-import type { ReportData } from "@/lib/report/types";
-import { round1, type ComparisonCell, type ColleagueCell } from "@/lib/scoring";
+import type { IndividualReportData } from "@/lib/report/build-individual-report-data";
+import type { ColleagueCell, ComparisonCell } from "@/lib/scoring";
 
-const SCALE_LABELS = ["Almost never", "Rarely", "Sometimes", "Often", "Usually", "Almost always"];
-const COMPETENCY_9_LABELS: Record<string, string> = {
-  standard: "Standard (Teaching, learning and standards)",
-  ops: "Ops variant (Operational standards and service quality)",
-};
+const TOTAL_PAGES = 17;
+const HIGH_THRESHOLD = 4.25;
+const LOW_THRESHOLD = 2.25;
+const SCALE_MAX = 5;
 
-function Section({
-  title,
-  children,
-  breakBefore = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  breakBefore?: boolean;
-}) {
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function PageNumber({ n }: { n: number }) {
   return (
-    <section className={`break-inside-avoid-page ${breakBefore ? "break-before-page" : ""} py-8`}>
-      <h2 className="mb-4 text-xl font-semibold text-zinc-900">{title}</h2>
-      {children}
-    </section>
+    <div className="pageno">
+      Page {n} of {TOTAL_PAGES}
+    </div>
   );
 }
 
-function Bar({ label, value, max = 6 }: { label: string; value: number | null; max?: number }) {
-  const pct = value === null ? 0 : (value / max) * 100;
+/** Self and "All others" are the only two cells ever circle-marked (filled
+ * gold >=4.25, outlined amber <=2.25) -- individual rater-group columns
+ * (manager, peer, direct reports, others) always show plain numbers, even
+ * when they themselves cross a threshold, per the approved sample. */
+function ScoreCell({ cell, canMark }: { cell: ComparisonCell; canMark: boolean }) {
+  if (cell.status !== "reported") return <>&mdash;</>;
+  if (canMark) {
+    if (cell.mean >= HIGH_THRESHOLD) return <span className="score high">{cell.mean}</span>;
+    if (cell.mean <= LOW_THRESHOLD) return <span className="score low">{cell.mean}</span>;
+  }
+  return <>{cell.mean}</>;
+}
+
+function ColleagueTd({ cell }: { cell: ColleagueCell }) {
+  if (cell.status === "reported") return <>{cell.mean}</>;
+  if (cell.status === "merged") return <span style={{ color: "var(--muted)", fontStyle: "italic" }}>Merged</span>;
+  return <>&mdash;</>;
+}
+
+function RangeBar({ range }: { range: { low: number; high: number; average: number } | null }) {
+  if (!range) return null;
+  const left = (range.low / SCALE_MAX) * 100;
+  const width = ((range.high - range.low) / SCALE_MAX) * 100;
+  const tick = (range.average / SCALE_MAX) * 100;
   return (
-    <div className="mb-2 flex items-center gap-3 text-sm">
-      <span className="w-32 shrink-0 text-zinc-600">{label}</span>
-      <div className="h-4 flex-1 overflow-hidden rounded bg-zinc-100">
-        {value !== null && <div className="h-full rounded bg-zinc-700" style={{ width: `${pct}%` }} />}
-      </div>
-      <span className="w-10 shrink-0 text-right font-medium text-zinc-900">
-        {value === null ? "—" : round1(value)}
+    <div className="range-bar">
+      <div className="range-fill" style={{ left: `${left}%`, width: `${width}%` }} />
+      <div className="range-tick" style={{ left: `${tick}%` }} />
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="legend">
+      <span>
+        <span className="score high" style={{ width: 15, height: 15, lineHeight: "15px", fontSize: 9 }}>
+          &nbsp;
+        </span>{" "}
+        4.25 and above
+      </span>
+      <span>
+        <span className="score low" style={{ width: 13, height: 13, lineHeight: "9px", fontSize: 9 }}>
+          &nbsp;
+        </span>{" "}
+        2.25 and below
+      </span>
+      <span>
+        <span style={{ width: 20, height: 5, background: "#C9C2B4", display: "inline-block", borderRadius: 3 }} />{" "}
+        colleague range, tick = average
       </span>
     </div>
   );
 }
 
-function CoverSection({ data }: { data: ReportData }) {
-  return (
-    <Section title="Cover and response rate">
-      <p className="text-lg font-medium text-zinc-900">{data.leaderName}</p>
-      {data.roleTitle && <p className="text-sm text-zinc-600">{data.roleTitle}</p>}
-      <p className="mt-1 text-sm text-zinc-600">
-        {data.cycleName} &middot; {data.periodStart} to {data.periodEnd}
-      </p>
-      <p className="mt-1 text-sm text-zinc-600">
-        Competency 9: {COMPETENCY_9_LABELS[data.competency9Variant]}
-      </p>
+const REPORT_STYLES = `
+.report-root { --navy:#1E2530; --navy-light:#2A3340; --gold:#C39A3E; --gold-dark:#B8872B; --gold-light:#E8CE60; --ink:#1E2530; --muted:#6B7280; --line:#E5E7EB; --paper:#FFFFFF; --canvas:#E8E6E0; --amber:#B5541E; --strength-bg:#FBF4E4; --gap-bg:#FBEFE4; }
+.report-root * { box-sizing: border-box; }
+.report-root { background: var(--canvas); font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); padding: 32px 0 80px; }
+.report-root .page { width: 780px; max-width: 94vw; margin: 0 auto 24px; background: var(--paper); box-shadow: 0 6px 24px rgba(0,0,0,0.14); border-radius: 4px; overflow: hidden; }
+.report-root .cover { background: var(--navy); color: #fff; padding: 72px 56px 56px; min-height: 480px; display: flex; flex-direction: column; justify-content: space-between; }
+.report-root .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.report-root .brand-mark { font-size: 12px; letter-spacing: 0.14em; color: var(--gold-light); font-weight: 600; }
+.report-root .report-tag { font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.25); padding: 5px 10px; border-radius: 3px; }
+.report-root .cover-mid { margin-top: 90px; }
+.report-root .cover-eyebrow { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 14px; }
+.report-root .cover-name { font-size: 44px; line-height: 1.1; font-weight: 600; background: linear-gradient(120deg, var(--gold-dark), var(--gold-light)); -webkit-background-clip: text; background-clip: text; color: transparent; margin: 0 0 18px; }
+.report-root .cover-role { font-size: 16px; color: rgba(255,255,255,0.75); }
+.report-root .cover-bottom { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 18px; }
+.report-root .cover-meta { font-size: 12px; color: rgba(255,255,255,0.55); }
+.report-root .cover-meta strong { display: block; color: #fff; font-size: 13px; font-weight: 500; margin-top: 2px; }
+.report-root .inner { padding: 36px 44px 44px; }
+.report-root .inner h2 { font-size: 19px; margin: 0 0 4px; color: var(--navy); }
+.report-root .inner .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }
+.report-root .pageno { text-align: right; font-size: 10.5px; color: var(--muted); padding: 8px 24px 14px; }
+.report-root .rank-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.report-root .rank-num { width: 18px; font-weight: 600; color: var(--muted); font-size: 12px; }
+.report-root .rank-content { flex: 1; min-width: 0; }
+.report-root .rank-text { font-size: 12.5px; margin-bottom: 5px; line-height: 1.3; }
+.report-root .rank-bar-track { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; }
+.report-root .rank-bar-fill { height: 100%; border-radius: 5px; }
+.report-root .rank-bar-fill.hi { background: linear-gradient(90deg, var(--gold-dark), var(--gold-light)); }
+.report-root .rank-bar-fill.lo { background: var(--amber); }
+.report-root .rank-score { width: 32px; text-align: right; font-weight: 600; font-size: 13px; }
+.report-root table.comp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.report-root table.comp-table th { background: var(--navy); color: #fff; font-weight: 500; text-align: center; padding: 7px 5px; font-size: 11px; }
+.report-root table.comp-table th:first-child, .report-root table.comp-table td:first-child { text-align: left; padding-left: 10px; }
+.report-root table.comp-table .summary-row td { background: #FBF4E4; font-weight: 600; padding: 8px 5px; border-bottom: 2px solid var(--gold); }
+.report-root table.comp-table td { padding: 8px 5px; text-align: center; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.report-root table.comp-table td.item-label { text-align: left; max-width: 210px; line-height: 1.35; font-size: 11.5px; }
+.report-root .score { display: inline-block; min-width: 20px; }
+.report-root .score.high { border-radius: 50%; background: var(--gold); color: #fff; width: 24px; height: 24px; line-height: 24px; font-weight: 600; font-size: 12px; }
+.report-root .score.low { border-radius: 50%; border: 2px solid var(--amber); color: var(--amber); width: 20px; height: 20px; line-height: 16px; font-weight: 600; font-size: 11px; }
+.report-root .range-cell { width: 95px; }
+.report-root .range-bar { position: relative; height: 6px; background: var(--line); border-radius: 3px; margin: 0 6px; }
+.report-root .range-fill { position: absolute; top: 0; bottom: 0; background: #C9C2B4; border-radius: 3px; }
+.report-root .range-tick { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--gold-dark); }
+.report-root .legend { display: flex; gap: 18px; font-size: 11px; color: var(--muted); margin-top: 14px; flex-wrap: wrap; }
+.report-root .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.report-root .plain-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+.report-root .plain-table th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--navy); }
+.report-root .plain-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.report-root .plain-table td.num { font-weight: 600; width: 46px; }
+.report-root .plain-table td.comp { color: var(--muted); font-size: 11.5px; width: 150px; }
+.report-root .comment-head { font-weight: 600; font-size: 12.5px; color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 6px; margin-bottom: 8px; margin-top: 18px; }
+.report-root .comment-body { font-size: 12.5px; line-height: 1.6; color: var(--ink); margin: 0 0 16px; }
+.report-root .plan-section { font-weight: 600; font-size: 12.5px; color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 6px; margin-bottom: 8px; margin-top: 20px; }
+.report-root .plan-box { height: 42px; border: 1px dashed var(--line); border-radius: 4px; margin-bottom: 8px; }
+.report-root .empty-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
 
-      <p className="mt-4 text-sm text-zinc-700">
-        Any figure drawn from fewer than 3 respondents in a group is combined with other small
-        groups or withheld, rather than shown — this is the anonymity threshold used throughout
-        this report.
-      </p>
-
-      <table className="mt-4 w-full text-left text-sm">
-        <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
-          <tr>
-            <th className="py-2 font-medium">Rater group</th>
-            <th className="py-2 font-medium">Invited</th>
-            <th className="py-2 font-medium">Responded</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-zinc-100">
-          {data.responseRates.map((row) => (
-            <tr key={row.group}>
-              <td className="py-2">{RATER_GROUP_LABELS[row.group]}</td>
-              <td className="py-2">{row.invited}</td>
-              <td className="py-2">{row.completed}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </Section>
-  );
+@media print {
+  body { background: #fff !important; }
+  .report-root { background: #fff; padding: 0; }
+  .report-root .page { box-shadow: none; border-radius: 0; width: auto; max-width: none; margin: 0; page-break-after: always; }
+  .report-root .page:last-child { page-break-after: auto; }
+  .report-root .cover { min-height: 100vh; }
 }
+`;
 
-function HowToReadSection() {
-  return (
-    <Section title="How to read this report">
-      <div className="space-y-3 text-sm text-zinc-700">
-        <p>
-          Every item is rated on a 6-point frequency scale, with no midpoint:{" "}
-          {SCALE_LABELS.map((l, i) => (
-            <span key={l}>
-              {i > 0 && ", "}
-              <strong>{i + 1} = {l}</strong>
-            </span>
-          ))}
-          .
-        </p>
-        <p>
-          Raters could also choose <strong>&ldquo;Not able to comment&rdquo;</strong> on any item.
-          Those responses are excluded from every mean shown in this report — they are never
-          treated as a midpoint or counted as a 0.
-        </p>
-        <p>
-          Any group&rsquo;s figure is only shown once at least <strong>3 people</strong> in that
-          group have answered. Smaller groups are combined into a single &ldquo;all
-          colleagues&rdquo; figure; if that combined figure is still under 3 people, it is marked
-          &ldquo;insufficient responses&rdquo; rather than shown as a number.
-        </p>
-        <p>
-          The <strong>manager</strong> is reported separately throughout, as a single identifiable
-          rater (n=1) — by design, not subject to the anonymity threshold above.
-        </p>
-      </div>
-    </Section>
-  );
-}
+export function ReportView({ data }: { data: IndividualReportData }) {
+  const settingLine = [data.roleTitle, data.organisationName].filter(Boolean).join(" · ");
+  let pageNum = 3; // pages 1-2 (cover, how to read) are fixed
 
-function CompetencyOverviewSection({ data }: { data: ReportData }) {
   return (
-    <Section title="Competency overview" breakBefore>
-      <p className="mb-4 text-sm text-zinc-600">
-        Ordered highest to lowest by &ldquo;all others&rdquo;.
-      </p>
-      <div className="space-y-5">
-        {data.competencyOverview.map((row) => (
-          <div key={row.competencyNumber}>
-            <p className="mb-1 text-sm font-medium text-zinc-900">
-              {row.competencyNumber}. {row.competencyName}
-            </p>
-            <Bar label="Self" value={row.self} />
-            <Bar label="All others" value={row.allOthers} />
-            <Bar label="Manager" value={row.manager} />
+    <div className="report-root">
+      <style dangerouslySetInnerHTML={{ __html: REPORT_STYLES }} />
+
+      {/* Page 1: cover */}
+      <div className="page">
+        <div className="cover">
+          <div className="cover-top">
+            <div className="brand-mark">COACH MY FUTURE</div>
+            <div className="report-tag">CONFIDENTIAL</div>
           </div>
-        ))}
-      </div>
-    </Section>
-  );
-}
-
-function comparisonCellText(cell: ComparisonCell): { text: string; flagged: boolean } {
-  if (cell.status === "reported") return { text: `${cell.mean} (n=${cell.n})`, flagged: false };
-  if (cell.status === "insufficient_responses") return { text: "Insufficient responses", flagged: true };
-  return { text: "—", flagged: false };
-}
-
-function colleagueCellText(cell: ColleagueCell): { text: string; flagged: boolean } {
-  if (cell.status === "reported") return { text: `${cell.mean} (n=${cell.n})`, flagged: false };
-  if (cell.status === "merged") return { text: "Merged †", flagged: true };
-  return { text: "—", flagged: false };
-}
-
-function RaterGroupComparisonSection({ data }: { data: ReportData }) {
-  const anyFootnote = data.raterGroupComparison.some(
-    (row) =>
-      row.peer.status === "merged" ||
-      row.directReport.status === "merged" ||
-      row.other.status === "merged" ||
-      row.allColleagues?.status === "insufficient_responses",
-  );
-
-  return (
-    <Section title="Rater group comparison">
-      <p className="mb-4 text-sm text-zinc-600">
-        Competency order is fixed (1 to 9) — this page compares groups against each other, not
-        against a score ranking.
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="py-2 pr-3 font-medium">Competency</th>
-              <th className="py-2 pr-3 font-medium">Self</th>
-              <th className="py-2 pr-3 font-medium">Manager</th>
-              <th className="py-2 pr-3 font-medium">Peers</th>
-              <th className="py-2 pr-3 font-medium">Direct reports</th>
-              <th className="py-2 pr-3 font-medium">Others</th>
-              <th className="py-2 font-medium">All colleagues</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {data.raterGroupComparison.map((row) => {
-              const self = comparisonCellText(row.self);
-              const manager = comparisonCellText(row.manager);
-              const peer = colleagueCellText(row.peer);
-              const directReport = colleagueCellText(row.directReport);
-              const other = colleagueCellText(row.other);
-              const allColleagues = row.allColleagues ? comparisonCellText(row.allColleagues) : null;
-              return (
-                <tr key={row.competencyNumber}>
-                  <td className="py-2 pr-3">
-                    {row.competencyNumber}. {row.competencyName}
-                  </td>
-                  <td className="py-2 pr-3">{self.text}</td>
-                  <td className="py-2 pr-3">{manager.text}</td>
-                  <td className="py-2 pr-3">{peer.text}</td>
-                  <td className="py-2 pr-3">{directReport.text}</td>
-                  <td className="py-2 pr-3">{other.text}</td>
-                  <td className="py-2">{allColleagues ? allColleagues.text : "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {anyFootnote && (
-        <p className="mt-3 text-xs text-zinc-500">
-          &dagger; This group had fewer than 3 respondents for that competency and was combined
-          into &ldquo;All colleagues&rdquo;.
-        </p>
-      )}
-    </Section>
-  );
-}
-
-function GapItemsSection({
-  title,
-  description,
-  items,
-  emptyMessage,
-}: {
-  title: string;
-  description: string;
-  items: ReportData["blindSpots"];
-  emptyMessage: string;
-}) {
-  return (
-    <Section title={title}>
-      <p className="mb-4 text-sm text-zinc-600">{description}</p>
-      {items.length === 0 ? (
-        <p className="text-sm text-zinc-500">{emptyMessage}</p>
-      ) : (
-        <ul className="space-y-3">
-          {items.map((item) => (
-            <li key={item.itemId} className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs font-medium text-zinc-500">
-                {item.competencyNumber}. {item.competencyName}
-              </p>
-              <p className="text-sm text-zinc-900">{item.behaviourText}</p>
-              <p className="mt-1 text-sm text-zinc-600">
-                Self {item.selfMean} &middot; All others {item.allOthersMean} &middot; Gap{" "}
-                {item.gap}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
-function HighestLowestSection({ data }: { data: ReportData }) {
-  const renderList = (rows: ReportData["highestLowestItems"]["highest"]) => (
-    <ol className="space-y-2 text-sm">
-      {rows.map((row) => (
-        <li key={row.itemId} className="flex justify-between gap-4 border-b border-zinc-100 pb-2">
-          <span>
-            <span className="text-xs text-zinc-500">
-              {row.competencyNumber}. {row.competencyName}
-            </span>
-            <br />
-            {row.behaviourText}
-          </span>
-          <span className="shrink-0 font-medium text-zinc-900">{row.allOthersMean}</span>
-        </li>
-      ))}
-    </ol>
-  );
-
-  return (
-    <Section title="Highest and lowest ten items" breakBefore>
-      <p className="mb-4 text-sm text-zinc-600">All-others mean, across every scored item.</p>
-      <div className="grid gap-8 sm:grid-cols-2">
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-zinc-900">Highest</h3>
-          {renderList(data.highestLowestItems.highest)}
-        </div>
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-zinc-900">Lowest</h3>
-          {renderList(data.highestLowestItems.lowest)}
-        </div>
-      </div>
-    </Section>
-  );
-}
-
-function DevelopmentPrioritiesSection({ data }: { data: ReportData }) {
-  return (
-    <Section title="Development priorities (forced choice)">
-      <p className="mb-4 text-sm text-zinc-600">
-        Top 10 items by colleague nomination count, from the &ldquo;pick 3 to improve&rdquo;
-        question. Self and manager are reference flags, not part of the ranking.
-      </p>
-      {data.developmentPriorities.length === 0 ? (
-        <p className="text-sm text-zinc-500">
-          No development priorities were identified this cycle.
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {data.developmentPriorities.map((item) => (
-            <li key={item.itemId} className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-xs font-medium text-zinc-500">
-                {item.competencyNumber}. {item.competencyName}
-              </p>
-              <p className="text-sm text-zinc-900">{item.behaviourText}</p>
-              <p className="mt-1 text-sm text-zinc-600">
-                {item.breakdown.mode === "separate" &&
-                  `Peers ${item.breakdown.peer} · Direct reports ${item.breakdown.directReport} · Others ${item.breakdown.other}`}
-                {item.breakdown.mode === "partial_merge" &&
-                  `${Object.entries(item.breakdown.separate)
-                    .map(([g, n]) => `${RATER_GROUP_LABELS[g as RaterGroup]} ${n}`)
-                    .join(" · ")}${
-                    Object.keys(item.breakdown.separate).length > 0 ? " · " : ""
-                  }All colleagues ${item.breakdown.allColleagues}`}
-                {item.breakdown.mode === "merge_failed" &&
-                  `${item.totalColleagueNominations} colleague nomination${item.totalColleagueNominations === 1 ? "" : "s"} (group under 3, not attributed)`}
-                {" · "}
-                Self {item.selfNominated ? "yes" : "no"} &middot; Manager{" "}
-                {item.managerNominated ? "yes" : "no"}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  );
-}
-
-function ItemAppendixSection({ data }: { data: ReportData }) {
-  return (
-    <Section title="Item-level appendix" breakBefore>
-      <p className="mb-4 text-sm text-zinc-600">
-        Every scored item, raw mean and n by rater group (no anonymity threshold applied on this
-        page), and count of &ldquo;not able to comment&rdquo;.
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="border-b border-zinc-200 text-xs uppercase text-zinc-500">
-            <tr>
-              <th className="py-2 pr-3 font-medium">Item</th>
-              {RATER_GROUPS.map((g) => (
-                <th key={g} className="py-2 pr-3 font-medium">
-                  {RATER_GROUP_LABELS[g]}
-                </th>
-              ))}
-              <th className="py-2 font-medium">N/A comment</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {data.itemAppendix.map((row) => (
-              <tr key={row.itemId}>
-                <td className="py-2 pr-3">
-                  <span className="text-xs text-zinc-500">
-                    {row.competencyNumber}.{row.itemNumber}
-                  </span>{" "}
-                  {row.behaviourText}
-                </td>
-                {RATER_GROUPS.map((g) => (
-                  <td key={g} className="py-2 pr-3">
-                    {row.groups[g].mean !== null
-                      ? `${round1(row.groups[g].mean!)} (n=${row.groups[g].n})`
-                      : "—"}
-                  </td>
-                ))}
-                <td className="py-2">{row.notAbleToCommentCount}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Section>
-  );
-}
-
-const COMMENT_FIELDS: { key: "continueText" | "startText" | "stopText"; label: string }[] = [
-  { key: "continueText", label: "Continue" },
-  { key: "startText", label: "Start" },
-  { key: "stopText", label: "Stop" },
-];
-
-function CommentsSection({ data }: { data: ReportData }) {
-  return (
-    <Section title="Written comments" breakBefore>
-      <p className="mb-4 text-sm text-zinc-700">
-        Verbatim, grouped as continue / start / stop, tagged only by rater group. Review before
-        distributing: remove names and unique identifying detail, without rewriting tone.
-      </p>
-      <div className="space-y-6">
-        {COMMENT_FIELDS.map(({ key, label }) => {
-          const entries = data.comments.filter((c) => c[key]);
-          return (
-            <div key={key}>
-              <h3 className="mb-2 text-sm font-semibold text-zinc-900">{label}</h3>
-              {entries.length === 0 ? (
-                <p className="text-sm text-zinc-500">No comments.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {entries.map((c) => (
-                    <li key={c.raterId} className="rounded-md border border-zinc-200 p-3 text-sm">
-                      <p className="mb-1 text-xs font-medium text-zinc-500">
-                        {RATER_GROUP_LABELS[c.group]}
-                      </p>
-                      <p className="whitespace-pre-line text-zinc-800">{c[key]}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          <div className="cover-mid">
+            <div className="cover-eyebrow">360&deg; leadership feedback report</div>
+            <div className="cover-name">{data.leaderName}</div>
+            {settingLine && <div className="cover-role">{settingLine}</div>}
+          </div>
+          <div className="cover-bottom">
+            <div className="cover-meta">
+              Review completed
+              <strong>{data.completedAt ? formatDate(data.completedAt) : "—"}</strong>
             </div>
-          );
-        })}
-      </div>
-    </Section>
-  );
-}
-
-function SafeguardingSection({ data }: { data: ReportData }) {
-  return (
-    <Section title="Safeguarding integrity check" breakBefore>
-      <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-        <p className="whitespace-pre-line">{SAFEGUARDING_WORDING}</p>
-      </div>
-      <p className="mb-3 text-sm text-zinc-600">
-        Reported as counts only. No mean, no benchmark, no trend line.
-      </p>
-      <div className="space-y-3">
-        {data.safeguarding.map((item) => (
-          <div key={item.itemId} className="rounded-lg border border-zinc-200 p-3 text-sm">
-            <p className="text-zinc-900">{item.behaviourText}</p>
-            <p className="mt-1 text-zinc-600">
-              Yes: {item.yes} &middot; No: {item.no} &middot; Not observed: {item.notObserved}
-            </p>
+            <div className="cover-meta">
+              Prepared by
+              <strong>Krasi Toneva, Coach My Future</strong>
+            </div>
           </div>
-        ))}
+        </div>
       </div>
-    </Section>
-  );
-}
 
-function DevelopmentPlanSection() {
-  return (
-    <Section title="Development plan" breakBefore>
-      <p className="mb-4 text-sm text-zinc-600">
-        Completed by the consultant during the debrief — not generated from the data above.
-      </p>
-      <div className="space-y-4 text-sm text-zinc-500">
-        <p className="border-b border-dashed border-zinc-300 pb-8">
-          Two strengths to deploy more deliberately
-        </p>
-        <p className="border-b border-dashed border-zinc-300 pb-8">
-          Two priorities from the development priorities section
-        </p>
-        <p className="border-b border-dashed border-zinc-300 pb-8">
-          Specific actions, with dates
-        </p>
-        <p className="border-b border-dashed border-zinc-300 pb-8">
-          One named person who will tell them the truth about progress
-        </p>
-        <p className="border-b border-dashed border-zinc-300 pb-8">Review date</p>
+      {/* Page 2: how to read this report */}
+      <div className="page">
+        <div className="inner">
+          <h2>How to read this report</h2>
+          <p className="sub">A short guide before the detail.</p>
+          <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+            Every item is rated on a 5-point scale: almost never, rarely, sometimes, usually, almost
+            always, plus &ldquo;not able to comment,&rdquo; which is excluded from every average rather
+            than treated as a neutral score.
+          </p>
+          <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+            A score of 4.25 or above is marked with a filled gold circle, a strength worth naming. A
+            score of 2.25 or below is marked with an outlined amber circle. Nothing in between is
+            marked, colour is used sparingly so it means something when it appears.
+          </p>
+          <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+            Each item also carries a small range bar: the lowest to highest individual rating from your
+            colleagues (peers, direct reports, and others, excluding you and your manager), with a tick
+            at their average. A tight bar means your colleagues agreed. A wide bar means they
+            didn&apos;t, and that disagreement is worth exploring even where the average looks
+            unremarkable.
+          </p>
+          <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+            Any group with fewer than 3 respondents on a given item is combined with another group to
+            protect anonymity, or, if still fewer than 3, left out of that figure entirely rather than
+            shown as a number. Your manager is reported separately throughout, since they are a single,
+            identifiable rater by design, and they know this.
+          </p>
+        </div>
+        <PageNumber n={2} />
       </div>
-    </Section>
-  );
-}
 
-export function ReportView({ data }: { data: ReportData }) {
-  return (
-    <div className="divide-y divide-zinc-200">
-      <CoverSection data={data} />
-      <HowToReadSection />
-      <CompetencyOverviewSection data={data} />
-      <RaterGroupComparisonSection data={data} />
-      <GapItemsSection
-        title="Blind spots"
-        description="Items where self exceeds the all-others mean by 1.0 or more. Capped at 8."
-        items={data.blindSpots}
-        emptyMessage="No blind spots were identified this cycle."
-      />
-      <GapItemsSection
-        title="Hidden strengths"
-        description="Items where the all-others mean exceeds self by 1.0 or more. Always shown in full."
-        items={data.hiddenStrengths}
-        emptyMessage="No hidden strengths were identified this cycle."
-      />
-      <HighestLowestSection data={data} />
-      <DevelopmentPrioritiesSection data={data} />
-      <ItemAppendixSection data={data} />
-      <CommentsSection data={data} />
-      <SafeguardingSection data={data} />
-      <DevelopmentPlanSection />
+      {/* Pages 3-11: one competency table per competency, questionnaire order */}
+      {data.competencyTables.map((table) => {
+        const n = pageNum++;
+        return (
+          <div className="page" key={table.competencyNumber}>
+            <div className="inner">
+              <h2>{table.competencyName}</h2>
+              <p className="sub">
+                Self, colleague average, and each rater group. Range bar shows the spread of colleague
+                ratings.
+              </p>
+              <table className="comp-table">
+                <thead>
+                  <tr>
+                    <th>{table.competencyName}</th>
+                    <th>Self</th>
+                    <th>All others</th>
+                    <th>Manager</th>
+                    <th>Peers</th>
+                    <th>Direct reports</th>
+                    <th>Others</th>
+                    <th>Range</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="summary-row">
+                    <td>Competency average</td>
+                    <td>
+                      <ScoreCell cell={table.summary.self} canMark={false} />
+                    </td>
+                    <td>
+                      <ScoreCell cell={table.summary.allOthers} canMark={false} />
+                    </td>
+                    <td>
+                      <ScoreCell cell={table.summary.manager} canMark={false} />
+                    </td>
+                    <td>
+                      <ColleagueTd cell={table.summary.peer} />
+                    </td>
+                    <td>
+                      <ColleagueTd cell={table.summary.directReport} />
+                    </td>
+                    <td>
+                      <ColleagueTd cell={table.summary.other} />
+                    </td>
+                    <td></td>
+                  </tr>
+                  {table.items.map((item) => (
+                    <tr key={item.itemId}>
+                      <td className="item-label">{item.behaviourText}</td>
+                      <td>
+                        <ScoreCell cell={item.self} canMark={true} />
+                      </td>
+                      <td>
+                        <ScoreCell cell={item.allOthers} canMark={true} />
+                      </td>
+                      <td>
+                        <ScoreCell cell={item.manager} canMark={false} />
+                      </td>
+                      <td>
+                        <ColleagueTd cell={item.peer} />
+                      </td>
+                      <td>
+                        <ColleagueTd cell={item.directReport} />
+                      </td>
+                      <td>
+                        <ColleagueTd cell={item.other} />
+                      </td>
+                      <td className="range-cell">
+                        <RangeBar range={item.colleagueRange} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <Legend />
+            </div>
+            <PageNumber n={n} />
+          </div>
+        );
+      })}
+
+      {/* Page 12: blind spots */}
+      <div className="page">
+        <div className="inner">
+          <h2>Blind spots</h2>
+          <p className="sub">Items where self exceeds the colleague average by 1.0 or more.</p>
+          {data.blindSpots.length === 0 ? (
+            <p className="empty-note">No blind spots were identified this cycle.</p>
+          ) : (
+            <table className="plain-table">
+              <thead>
+                <tr>
+                  <th>Self</th>
+                  <th>Others</th>
+                  <th>Statement</th>
+                  <th>Competency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.blindSpots.map((row) => (
+                  <tr key={row.itemId}>
+                    <td className="num">{row.selfMean}</td>
+                    <td className="num">{row.allOthersMean}</td>
+                    <td>{row.behaviourText}</td>
+                    <td className="comp">{row.competencyName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <PageNumber n={12} />
+      </div>
+
+      {/* Page 13: hidden strengths */}
+      <div className="page">
+        <div className="inner">
+          <h2>Hidden strengths</h2>
+          <p className="sub">Items where the colleague average exceeds self by 1.0 or more.</p>
+          {data.hiddenStrengths.length === 0 ? (
+            <p className="empty-note">No hidden strengths were identified this cycle.</p>
+          ) : (
+            <table className="plain-table">
+              <thead>
+                <tr>
+                  <th>Others</th>
+                  <th>Self</th>
+                  <th>Statement</th>
+                  <th>Competency</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.hiddenStrengths.map((row) => (
+                  <tr key={row.itemId}>
+                    <td className="num">{row.allOthersMean}</td>
+                    <td className="num">{row.selfMean}</td>
+                    <td>{row.behaviourText}</td>
+                    <td className="comp">{row.competencyName}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <PageNumber n={13} />
+      </div>
+
+      {/* Page 14: highest and lowest five */}
+      <div className="page">
+        <div className="inner">
+          <h2>Highest and lowest five items</h2>
+          <p className="sub">Across all items, by colleague average.</p>
+          <p style={{ fontWeight: 600, fontSize: 12.5, color: "var(--navy)", margin: "16px 0 10px" }}>Highest</p>
+          {data.highestLowest.highest.map((row, i) => (
+            <div className="rank-row" key={row.itemId}>
+              <div className="rank-num">{i + 1}</div>
+              <div className="rank-content">
+                <div className="rank-text">
+                  {row.behaviourText} <span style={{ color: "var(--muted)", fontSize: 11 }}>&middot; {row.competencyName}</span>
+                </div>
+                <div className="rank-bar-track">
+                  <div className="rank-bar-fill hi" style={{ width: `${(row.allOthersMean / SCALE_MAX) * 100}%` }} />
+                </div>
+              </div>
+              <div className="rank-score">{row.allOthersMean}</div>
+            </div>
+          ))}
+          <p style={{ fontWeight: 600, fontSize: 12.5, color: "var(--navy)", margin: "22px 0 10px" }}>Lowest</p>
+          {data.highestLowest.lowest.map((row, i) => (
+            <div className="rank-row" key={row.itemId}>
+              <div className="rank-num">{i + 1}</div>
+              <div className="rank-content">
+                <div className="rank-text">
+                  {row.behaviourText} <span style={{ color: "var(--muted)", fontSize: 11 }}>&middot; {row.competencyName}</span>
+                </div>
+                <div className="rank-bar-track">
+                  <div className="rank-bar-fill lo" style={{ width: `${(row.allOthersMean / SCALE_MAX) * 100}%` }} />
+                </div>
+              </div>
+              <div className="rank-score">{row.allOthersMean}</div>
+            </div>
+          ))}
+        </div>
+        <PageNumber n={14} />
+      </div>
+
+      {/* Page 15: development priorities */}
+      <div className="page">
+        <div className="inner">
+          <h2>Development priorities</h2>
+          <p className="sub">
+            Top 10 items by colleague nomination as &ldquo;would make the biggest difference if
+            improved.&rdquo; Self and manager shown as separate flags.
+          </p>
+          {data.developmentPriorities.length === 0 ? (
+            <p className="empty-note">No development priorities were identified this cycle.</p>
+          ) : (
+            <table className="plain-table">
+              <thead>
+                <tr>
+                  <th>Nominations</th>
+                  <th>Statement</th>
+                  <th>Competency</th>
+                  <th>Self picked</th>
+                  <th>Manager picked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.developmentPriorities.map((row) => (
+                  <tr key={row.itemId}>
+                    <td className="num">{row.totalColleagueNominations}</td>
+                    <td>{row.behaviourText}</td>
+                    <td className="comp">{row.competencyName}</td>
+                    <td style={{ textAlign: "center", width: 50 }}>{row.selfNominated ? "yes" : "no"}</td>
+                    <td style={{ textAlign: "center", width: 60 }}>{row.managerNominated ? "yes" : "no"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <PageNumber n={15} />
+      </div>
+
+      {/* Page 16: written comments */}
+      <div className="page">
+        <div className="inner">
+          <h2>Written comments</h2>
+          <p className="sub">
+            Grouped by competency, then the 3 overall questions. Identifying detail removed, wording
+            otherwise untouched. Competencies with no comments received are not listed.
+          </p>
+          {data.competencyComments.map((c, i) => (
+            <div key={i}>
+              <div className="comment-head">{c.competencyName}</div>
+              <p className="comment-body">{c.text}</p>
+            </div>
+          ))}
+          {data.overallComments.length > 0 && (
+            <>
+              <div className="comment-head">Continue, start, stop</div>
+              {data.overallComments.map((c, i) => (
+                <div key={i} style={{ marginBottom: 12 }}>
+                  {c.continueText && (
+                    <p className="comment-body">
+                      <strong>Continue:</strong> {c.continueText}
+                    </p>
+                  )}
+                  {c.startText && (
+                    <p className="comment-body">
+                      <strong>Start:</strong> {c.startText}
+                    </p>
+                  )}
+                  {c.stopText && (
+                    <p className="comment-body">
+                      <strong>Stop:</strong> {c.stopText}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
+          {data.competencyComments.length === 0 && data.overallComments.length === 0 && (
+            <p className="empty-note">No written comments were received this cycle.</p>
+          )}
+        </div>
+        <PageNumber n={16} />
+      </div>
+
+      {/* Page 17: development plan -- all boxes empty, for the consultant to
+          fill in during the debrief. Nothing else on this page. */}
+      <div className="page">
+        <div className="inner">
+          <h2>Development plan</h2>
+          <div className="plan-section">2 strengths to deploy more deliberately</div>
+          <div className="plan-box" />
+          <div className="plan-box" />
+          <div className="plan-section">2 priorities from the development priorities page</div>
+          <div className="plan-box" />
+          <div className="plan-box" />
+          <div className="plan-section">Specific actions, with dates</div>
+          <div className="plan-box" />
+          <div className="plan-box" />
+          <div className="plan-box" />
+          <div className="plan-box" />
+        </div>
+        <PageNumber n={17} />
+      </div>
     </div>
   );
 }

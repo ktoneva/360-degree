@@ -220,11 +220,12 @@ export async function setCycleStatus(
     const supabase = createAdminClient();
     const { error } = await supabase
       .from("review_cycles")
-      .update({ status })
+      .update({ status, completed_at: status === "closed" ? new Date().toISOString() : null })
       .eq("id", cycleId);
     if (error) return { error: error.message };
 
     revalidatePath(`/admin/cycles/${cycleId}`);
+    revalidatePath(`/admin/cycles/${cycleId}/report`);
     return { error: null };
   } catch {
     return { error: UNEXPECTED_ERROR };

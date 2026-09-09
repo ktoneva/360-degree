@@ -19,7 +19,7 @@ describe("computeHighestLowestItems", () => {
     const items = itemBank(3);
     const peers = makeRaters("peer", 3);
     const responses = [
-      ...peers.map((p) => scaleResponse(p.id, items[0].id, 6)),
+      ...peers.map((p) => scaleResponse(p.id, items[0].id, 5)),
       ...peers.map((p) => scaleResponse(p.id, items[1].id, 3)),
       ...peers.map((p) => scaleResponse(p.id, items[2].id, 1)),
     ];
@@ -38,13 +38,13 @@ describe("computeHighestLowestItems", () => {
     expect(result.lowest).toEqual([]);
   });
 
-  it("caps each list at 10 even when more items qualify", () => {
+  it("caps each list at 5 even when more items qualify", () => {
     const items = itemBank(15);
     const peers = makeRaters("peer", 3);
     const responses = items.flatMap((item, i) => peers.map((p) => scaleResponse(p.id, item.id, 1 + (i % 5))));
     const result = computeHighestLowestItems(buildDataset({ items, raters: peers, responses }));
-    expect(result.highest).toHaveLength(10);
-    expect(result.lowest).toHaveLength(10);
+    expect(result.highest).toHaveLength(5);
+    expect(result.lowest).toHaveLength(5);
   });
 
   it("does not require self to have rated the item, unlike blind spots", () => {

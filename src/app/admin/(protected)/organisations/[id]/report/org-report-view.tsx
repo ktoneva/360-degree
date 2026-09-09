@@ -1,7 +1,7 @@
 import { round1 } from "@/lib/scoring";
 import type { OrgReportData } from "@/lib/report/build-org-report-data";
 
-function Bar({ label, value, max = 6 }: { label: string; value: number | null; max?: number }) {
+function Bar({ label, value, max = 5 }: { label: string; value: number | null; max?: number }) {
   const pct = value === null ? 0 : (value / max) * 100;
   return (
     <div className="mb-2 flex items-center gap-3 text-sm">
