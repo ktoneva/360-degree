@@ -80,6 +80,7 @@ export interface Rater {
   invited_at: string;
   started_at: string | null;
   completed_at: string | null;
+  archived_at: string | null;
 }
 
 export type ItemResponseType = "scale" | "yes_no_not_observed";

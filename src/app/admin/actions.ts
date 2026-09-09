@@ -144,6 +144,138 @@ export async function addRater(
   }
 }
 
+export async function updateRater(
+  raterId: string,
+  cycleId: string,
+  fields: { fullName: string; email: string; raterGroup: RaterGroup },
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  const fullName = fields.fullName.trim() || null;
+  const email = fields.email.trim() || null;
+
+  if (!fields.raterGroup) {
+    return { error: "Choose a rater group." };
+  }
+
+  try {
+    const supabase = createAdminClient();
+
+    // Only ever touches raters columns -- name/email/group are metadata
+    // about the rater, never the rows in responses/forced_choice_nominations/
+    // comments/competency_comments, so a submitted rater's answers are
+    // untouched by this, whatever gets corrected here.
+    const { error } = await supabase
+      .from("raters")
+      .update({ full_name: fullName, email, rater_group: fields.raterGroup })
+      .eq("id", raterId);
+
+    if (error) {
+      if (error.code === "23505") {
+        const message =
+          fields.raterGroup === "self"
+            ? "This cycle already has a self rater."
+            : fields.raterGroup === "manager"
+              ? "This cycle already has a manager rater."
+              : "That rater couldn't be saved (duplicate).";
+        return { error: message };
+      }
+      return { error: error.message };
+    }
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}
+
+/**
+ * Removes a rater. Never trusts the caller about whether they've submitted
+ * anything -- re-checks the actual response tables so the decision can't be
+ * fooled by a stale admin-console view. A rater with zero rows anywhere is
+ * hard-deleted outright; anyone with even one row (a full submission, or a
+ * partial in-progress one -- both already feed into live scoring) is
+ * archived instead, since a hard delete would cascade and permanently
+ * destroy that data.
+ */
+export async function removeRater(
+  raterId: string,
+  cycleId: string,
+): Promise<{ error: string | null; result?: "deleted" | "archived" }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  try {
+    const supabase = createAdminClient();
+
+    const [responses, nominations, comments, competencyComments] = await Promise.all([
+      supabase.from("responses").select("id", { count: "exact", head: true }).eq("rater_id", raterId),
+      supabase
+        .from("forced_choice_nominations")
+        .select("id", { count: "exact", head: true })
+        .eq("rater_id", raterId),
+      supabase.from("comments").select("id", { count: "exact", head: true }).eq("rater_id", raterId),
+      supabase
+        .from("competency_comments")
+        .select("id", { count: "exact", head: true })
+        .eq("rater_id", raterId),
+    ]);
+    const countError =
+      responses.error ?? nominations.error ?? comments.error ?? competencyComments.error;
+    if (countError) return { error: countError.message };
+
+    const hasAnyData =
+      (responses.count ?? 0) > 0 ||
+      (nominations.count ?? 0) > 0 ||
+      (comments.count ?? 0) > 0 ||
+      (competencyComments.count ?? 0) > 0;
+
+    if (!hasAnyData) {
+      const { error } = await supabase.from("raters").delete().eq("id", raterId);
+      if (error) return { error: error.message };
+      revalidatePath(`/admin/cycles/${cycleId}`);
+      return { error: null, result: "deleted" };
+    }
+
+    const { error } = await supabase
+      .from("raters")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", raterId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    revalidatePath(`/admin/cycles/${cycleId}/report`);
+    return { error: null, result: "archived" };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}
+
+export async function unarchiveRater(
+  raterId: string,
+  cycleId: string,
+): Promise<{ error: string | null }> {
+  const { error: authError } = await requireAdminUser();
+  if (authError) return { error: authError };
+
+  try {
+    const supabase = createAdminClient();
+    const { error } = await supabase
+      .from("raters")
+      .update({ archived_at: null })
+      .eq("id", raterId);
+    if (error) return { error: error.message };
+
+    revalidatePath(`/admin/cycles/${cycleId}`);
+    revalidatePath(`/admin/cycles/${cycleId}/report`);
+    return { error: null };
+  } catch {
+    return { error: UNEXPECTED_ERROR };
+  }
+}
+
 export async function updateLinkExpiry(
   cycleId: string,
   days: number,

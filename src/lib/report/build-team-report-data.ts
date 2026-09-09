@@ -124,7 +124,8 @@ export async function buildTeamReportData(
   const { data: raters, error: ratersError } = await supabase
     .from("raters")
     .select("id, review_cycle_id, rater_group")
-    .in("review_cycle_id", cycleIds);
+    .in("review_cycle_id", cycleIds)
+    .is("archived_at", null);
   if (ratersError) throw new Error(ratersError.message);
 
   const raterIds = (raters ?? []).map((r) => r.id as string);

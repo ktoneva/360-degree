@@ -70,7 +70,8 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
   const { data: raters, error: ratersError } = await supabase
     .from("raters")
     .select("id, rater_group")
-    .eq("review_cycle_id", cycleId);
+    .eq("review_cycle_id", cycleId)
+    .is("archived_at", null);
   if (ratersError) throw new Error(ratersError.message);
 
   const raterIds = (raters ?? []).map((r) => r.id as string);

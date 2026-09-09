@@ -11,8 +11,7 @@ import {
   type RaterGroup,
 } from "@/lib/types";
 import { AddRaterForm } from "./add-rater-form";
-import { CopyLinkButton } from "./copy-link-button";
-import { ReopenRaterButton } from "./reopen-rater-button";
+import { RaterTableRow } from "./rater-table-row";
 import { LinkExpiryEditor } from "./link-expiry-editor";
 import { CycleStatusControl } from "./cycle-status-control";
 
@@ -24,12 +23,6 @@ const COMPETENCY_9_LABELS: Record<string, string> = {
   standard: "Standard (Teaching, learning and standards)",
   ops: "Ops variant (Operational standards and service quality)",
 };
-
-function raterStatus(rater: Rater) {
-  if (rater.completed_at) return { label: "Completed", date: rater.completed_at };
-  if (rater.started_at) return { label: "Started", date: rater.started_at };
-  return { label: "Not started", date: null };
-}
 
 const SENDER_SIGNOFF = "Krasi Toneva, Coach My Future";
 
@@ -119,6 +112,10 @@ export default async function CycleDetailPage({
   const ratersByGroup = new Map<RaterGroup, Rater[]>();
   for (const group of RATER_GROUPS) ratersByGroup.set(group, []);
   for (const rater of raters ?? []) {
+    // Archived raters are excluded from completion counts, same as they are
+    // from every report -- they're still listed in the table below so the
+    // admin can review or undo the archive.
+    if ((rater as Rater).archived_at) continue;
     ratersByGroup.get(rater.rater_group as RaterGroup)?.push(rater as Rater);
   }
 
@@ -203,7 +200,6 @@ export default async function CycleDetailPage({
               </tr>
             )}
             {(raters as Rater[] | null)?.map((rater) => {
-              const status = raterStatus(rater);
               const link = getRaterLink(rater.token);
               const mailto = buildMailto(
                 rater,
@@ -214,50 +210,7 @@ export default async function CycleDetailPage({
                 cycle.period_end,
               );
               return (
-                <tr key={rater.id}>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-zinc-900">{rater.full_name ?? "—"}</p>
-                    <p className="text-xs text-zinc-500">{rater.email ?? "No email on file"}</p>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {RATER_GROUP_LABELS[rater.rater_group as RaterGroup]}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={
-                        status.label === "Completed"
-                          ? "rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
-                          : status.label === "Started"
-                            ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
-                            : "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600"
-                      }
-                    >
-                      {status.label}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <CopyLinkButton link={link} />
-                      {mailto ? (
-                        <a
-                          href={mailto}
-                          className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
-                        >
-                          Email
-                        </a>
-                      ) : (
-                        <span className="text-xs text-zinc-400">No email</span>
-                      )}
-                      {status.label === "Completed" && (
-                        <ReopenRaterButton
-                          raterId={rater.id}
-                          cycleId={id}
-                          raterLabel={rater.full_name ?? "This rater"}
-                        />
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                <RaterTableRow key={rater.id} rater={rater} cycleId={id} link={link} mailto={mailto} />
               );
             })}
           </tbody>
