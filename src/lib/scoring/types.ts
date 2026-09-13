@@ -29,13 +29,18 @@ export interface ScoringRater {
 
 /**
  * One row per rater per item that has *some* recorded answer. Omit the row
- * entirely if the rater never answered that item — that's equivalent to
- * "not able to comment" for every calculation here.
+ * entirely if the rater never answered that item at all — that omission is
+ * the only way "never answered" is represented, and it is NOT the same as
+ * "not able to comment" (a row with scaleValue null): the former never
+ * counts toward anything, the latter is excluded from every mean but still
+ * counts as a response for the n>=3 anonymity threshold (v15).
  */
 export interface ScoringResponse {
   raterId: string;
   itemId: string;
-  /** 1-6 for a real scale rating; null for "not able to comment" or unanswered. */
+  /** 1-6 for a real scale rating; null for "not able to comment" (a row
+   * still exists) — for a scored item, never null because the item was
+   * simply unanswered, since an unanswered item has no row at all. */
   scaleValue: number | null;
   /** yes/no/not_observed for an integrity item's answer; null otherwise. */
   integrityValue: "yes" | "no" | "not_observed" | null;

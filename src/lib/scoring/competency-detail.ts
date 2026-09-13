@@ -57,9 +57,10 @@ function toCell(mean: number | null, n: number): ComparisonCell {
  * 3 separate sections -- competency overview, rater group comparison, and
  * the item-level appendix -- into a single summary-row-plus-item-rows table.
  * The summary row reuses computeRaterGroupComparison unchanged; item rows
- * apply the identical per-group n>=3-and-merge logic one level down, per
- * item rather than per competency (Blind spots logic tab, steps 2-4), since
- * rater attendance varies even more at item level than at competency level.
+ * apply the identical per-group n>=3-responders-and-merge logic one level
+ * down, per item rather than per competency (Blind spots logic tab, steps
+ * 2-4), since rater attendance varies even more at item level than at
+ * competency level.
  */
 export function computeCompetencyDetailTables(dataset: ScoringDataset): CompetencyDetailTable[] {
   const ratersByGroup = groupRatersByGroup(dataset.raters);
@@ -89,13 +90,39 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
           direct_report: itemGroupMean(dataset.responses, item.id, ratersByGroup.direct_report),
           other: itemGroupMean(dataset.responses, item.id, ratersByGroup.other),
         };
-        const safeGroups = MERGEABLE_GROUPS.filter((g) => groupResults[g].n >= 3);
+        // n>=3 responders, real rating or "not able to comment" (v15) — a
+        // group that clears that but has zero real ratings has nothing to
+        // report and isn't short on responders either, so it's excluded from
+        // both the safe list and the merge pool below, same as at competency
+        // level.
+        const existingItemGroups = MERGEABLE_GROUPS.filter((g) => ratersByGroup[g].length > 0);
+        const safeGroups = existingItemGroups.filter(
+          (g) => groupResults[g].respondentCount >= 3 && groupResults[g].mean !== null,
+        );
+        const groupsToMerge = existingItemGroups.filter((g) => !safeGroups.includes(g));
+
+        let pooledCell: ColleagueCell | null = null;
+        if (groupsToMerge.length > 0) {
+          const mergedRaterIds = groupsToMerge.flatMap((g) => ratersByGroup[g]);
+          const merged = itemGroupMean(dataset.responses, item.id, mergedRaterIds);
+          pooledCell =
+            merged.respondentCount >= 3 && merged.mean !== null
+              ? { status: "reported", mean: round1(merged.mean), n: merged.respondentCount }
+              : { status: "insufficient_responses" };
+        }
 
         const colleagueCell = (group: MergeableGroup): ColleagueCell => {
           if (ratersByGroup[group].length === 0) return { status: "no_data" };
-          return safeGroups.includes(group)
-            ? { status: "reported", mean: round1(groupResults[group].mean!), n: groupResults[group].n }
-            : { status: "merged" };
+          if (safeGroups.includes(group)) {
+            return {
+              status: "reported",
+              mean: round1(groupResults[group].mean!),
+              n: groupResults[group].respondentCount,
+            };
+          }
+          // Folded into this item's pooled colleagues figure — show that
+          // same resolved value here too, never a bare "merged" placeholder.
+          return pooledCell!;
         };
 
         const colleagueRaterIds = new Set([

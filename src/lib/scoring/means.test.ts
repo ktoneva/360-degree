@@ -13,7 +13,7 @@ describe("round1", () => {
 });
 
 describe("itemGroupMean", () => {
-  it("excludes 'not able to comment' (null scaleValue) from both mean and count", () => {
+  it("excludes 'not able to comment' (null scaleValue) from both mean and n", () => {
     const peers = makeRaters("peer", 3);
     const responses = [
       scaleResponse(peers[0].id, ITEM_C1.id, 6),
@@ -25,10 +25,32 @@ describe("itemGroupMean", () => {
     expect(result.mean).toBe(5);
   });
 
+  it("still counts 'not able to comment' toward respondentCount, the n>=3 threshold figure (v15)", () => {
+    const peers = makeRaters("peer", 3);
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(peers[1].id, ITEM_C1.id, 4),
+      scaleResponse(peers[2].id, ITEM_C1.id, null), // not able to comment
+    ];
+    const result = itemGroupMean(responses, ITEM_C1.id, peers.map((p) => p.id));
+    // All 3 responded in some form, even though only 2 gave a real rating.
+    expect(result.respondentCount).toBe(3);
+    expect(result.n).toBe(2);
+    expect(result.mean).toBe(5);
+  });
+
+  it("does not count a rater who never answered the item at all (no row) toward respondentCount", () => {
+    const peers = makeRaters("peer", 3);
+    const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 6), scaleResponse(peers[1].id, ITEM_C1.id, 4)];
+    // peers[2] has no row at all for this item -- never answered, not "not able to comment".
+    const result = itemGroupMean(responses, ITEM_C1.id, peers.map((p) => p.id));
+    expect(result.respondentCount).toBe(2);
+  });
+
   it("returns null mean and n=0 when nobody in the group answered", () => {
     const peers = makeRaters("peer", 2);
     const result = itemGroupMean([], ITEM_C1.id, peers.map((p) => p.id));
-    expect(result).toEqual({ mean: null, n: 0 });
+    expect(result).toEqual({ mean: null, n: 0, respondentCount: 0 });
   });
 
   it("dedupes a rater who somehow has two rows for the same item (keeps the last)", () => {
@@ -63,6 +85,18 @@ describe("competencyGroupMean", () => {
     ];
     const result = competencyGroupMean(responses, [ITEM_C1.id, ITEM_C1_B.id], peers.map((p) => p.id));
     expect(result.respondentCount).toBe(1);
+  });
+
+  it("counts a 'not able to comment' response toward respondentCount but never toward the mean (v15)", () => {
+    const peers = makeRaters("peer", 3);
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(peers[1].id, ITEM_C1.id, 4),
+      scaleResponse(peers[2].id, ITEM_C1.id, null), // not able to comment
+    ];
+    const result = competencyGroupMean(responses, [ITEM_C1.id, ITEM_C1_B.id], peers.map((p) => p.id));
+    expect(result.respondentCount).toBe(3); // all 3 responded in some form
+    expect(result.mean).toBe(5); // built from only the 2 real ratings
   });
 });
 
@@ -130,5 +164,37 @@ describe("itemAllOthersMean", () => {
     const ratersByGroup = groupRatersByGroup([]);
     const result = itemAllOthersMean([], ITEM_C1.id, ratersByGroup);
     expect(result).toEqual({ mean: null, totalRealRatings: 0 });
+  });
+
+  it("a group of 3 clears the threshold even when one member said 'not able to comment' (v15)", () => {
+    // The exact scenario that surfaced the "Merged" bug: 3 peers is enough on
+    // its own, but the old count excluded the not-able-to-comment peer and
+    // treated the group as under 3, forcing a doomed self-merge.
+    const peers = makeRaters("peer", 3);
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(peers[1].id, ITEM_C1.id, 4),
+      scaleResponse(peers[2].id, ITEM_C1.id, null), // not able to comment
+    ];
+    const ratersByGroup = groupRatersByGroup(peers);
+    const result = itemAllOthersMean(responses, ITEM_C1.id, ratersByGroup);
+    // Mean built from only the 2 real ratings, per step 2 -- never from n=1.
+    expect(result.mean).toBe(5);
+    expect(result.totalRealRatings).toBe(2);
+  });
+
+  it("a group with zero real ratings, despite 3+ responders, reports nothing and isn't merged away", () => {
+    const peers = makeRaters("peer", 3);
+    const others = makeRaters("other", 3); // safe, so it would otherwise absorb a merge
+    const responses = [
+      ...peers.map((p) => scaleResponse(p.id, ITEM_C1.id, null)), // all 3 "not able to comment"
+      ...others.map((o) => scaleResponse(o.id, ITEM_C1.id, 4)),
+    ];
+    const ratersByGroup = groupRatersByGroup([...peers, ...others]);
+    const result = itemAllOthersMean(responses, ITEM_C1.id, ratersByGroup);
+    // Peers clear the responder threshold but have nothing to average, so
+    // only "other" (4) contributes -- peers are not folded into a merge pool.
+    expect(result.mean).toBe(4);
+    expect(result.totalRealRatings).toBe(3);
   });
 });

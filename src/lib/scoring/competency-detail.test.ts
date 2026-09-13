@@ -37,7 +37,7 @@ describe("computeCompetencyDetailTables", () => {
     expect(item1.peer).toEqual({ status: "reported", mean: 5, n: 3 });
   });
 
-  it("item row: a group with n<3 on this specific item shows merged, even if the competency-level summary reported it separately", () => {
+  it("item row: a group with n<3 on this specific item resolves to insufficient responses, even if the competency-level summary reported it separately", () => {
     // 3 peers total (competency-level n=3, reported), but only 1 of them
     // actually answered this specific item -- item-level attendance is
     // tracked independently per the Blind spots logic tab.
@@ -51,8 +51,42 @@ describe("computeCompetencyDetailTables", () => {
     const [c1] = computeCompetencyDetailTables(buildDataset({ raters: peers, responses }));
     expect(c1.summary.peer.status).toBe("reported"); // 3 peers answered *something* in competency 1
 
+    // Only 1 peer answered this item specifically -- resolves to the same
+    // "insufficient responses" text the pooled figure would show, never a
+    // bare "merged" placeholder.
     const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
-    expect(item1.peer).toEqual({ status: "merged" }); // only 1 peer answered this item specifically
+    expect(item1.peer).toEqual({ status: "insufficient_responses" });
+  });
+
+  it("item row: 'not able to comment' still counts toward n>=3, so a group of 3 with one such response reports its own mean from the real ratings only (v15)", () => {
+    const peers = makeRaters("peer", 3);
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(peers[1].id, ITEM_C1.id, 4),
+      scaleResponse(peers[2].id, ITEM_C1.id, null), // not able to comment
+    ];
+    const [c1] = computeCompetencyDetailTables(buildDataset({ raters: peers, responses }));
+    const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
+    expect(item1.peer).toEqual({ status: "reported", mean: 5, n: 3 });
+  });
+
+  it("item row: a merged group's own cell shows the actual pooled mean, never the literal string 'Merged'", () => {
+    const peers = makeRaters("peer", 1); // under 3
+    const directReports = makeRaters("direct_report", 2); // under 3
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(directReports[0].id, ITEM_C1.id, 1),
+      scaleResponse(directReports[1].id, ITEM_C1.id, 1),
+    ];
+    const [c1] = computeCompetencyDetailTables(
+      buildDataset({ raters: [...peers, ...directReports], responses }),
+    );
+    const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
+    // Pooled mean (6+1+1)/3 = 2.7, shown directly in both merged groups' own
+    // cells -- no "status: merged" value exists anywhere in this type.
+    expect(item1.peer).toEqual({ status: "reported", mean: 2.7, n: 3 });
+    expect(item1.directReport).toEqual({ status: "reported", mean: 2.7, n: 3 });
+    expect(JSON.stringify(item1)).not.toContain("merged");
   });
 
   it("self and manager are always shown plainly regardless of n", () => {
@@ -64,12 +98,12 @@ describe("computeCompetencyDetailTables", () => {
     expect(item1.manager).toEqual({ status: "no_data" });
   });
 
-  it("colleague range is computed unconditionally, even when the group cells are merged for anonymity", () => {
-    const peers = makeRaters("peer", 2); // under 3 -> merged
+  it("colleague range is computed unconditionally, even when the group cells are suppressed for anonymity", () => {
+    const peers = makeRaters("peer", 2); // under 3 -> insufficient responses
     const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 2), scaleResponse(peers[1].id, ITEM_C1.id, 5)];
     const [c1] = computeCompetencyDetailTables(buildDataset({ raters: peers, responses }));
     const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
-    expect(item1.peer).toEqual({ status: "merged" });
+    expect(item1.peer).toEqual({ status: "insufficient_responses" });
     expect(item1.colleagueRange).toEqual({ low: 2, high: 5, average: 3.5 });
   });
 

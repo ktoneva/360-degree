@@ -49,9 +49,11 @@ describe("computeRaterGroupComparison", () => {
       buildDataset({ raters: [...peers, ...others], responses }),
     );
 
-    expect(c1.peer).toEqual({ status: "merged" });
+    // Merged pool of peers only (2 people) is itself under 3 -> insufficient,
+    // and the peer cell shows that same resolved figure, never a bare
+    // "merged" placeholder.
+    expect(c1.peer).toEqual({ status: "insufficient_responses" });
     expect(c1.other).toEqual({ status: "reported", mean: 2, n: 3 });
-    // Merged pool of peers only (2 people) is itself under 3 -> insufficient.
     expect(c1.allColleagues).toEqual({ status: "insufficient_responses" });
   });
 
@@ -70,6 +72,24 @@ describe("computeRaterGroupComparison", () => {
     // 3 people merged (1 peer + 2 DR): pooled mean = (6+1+1)/3 = 2.666... -> 2.7
     // NOT the average of group means ((6 + 1) / 2 = 3.5).
     expect(c1.allColleagues).toEqual({ status: "reported", mean: 2.7, n: 3 });
+    // Both merged groups' own cells show that exact same resolved figure --
+    // a real number, never a "merged" placeholder distinct from allColleagues.
+    expect(c1.peer).toEqual({ status: "reported", mean: 2.7, n: 3 });
+    expect(c1.directReport).toEqual({ status: "reported", mean: 2.7, n: 3 });
+  });
+
+  it("counts 'not able to comment' toward the n>=3 threshold, so a group of 3 with one such response still reports its own figure (v15)", () => {
+    const peers = makeRaters("peer", 3);
+    const responses = [
+      scaleResponse(peers[0].id, ITEM_C1.id, 6),
+      scaleResponse(peers[1].id, ITEM_C1.id, 4),
+      scaleResponse(peers[2].id, ITEM_C1.id, null), // not able to comment
+    ];
+    const [c1] = computeRaterGroupComparison(buildDataset({ raters: peers, responses }));
+    // All 3 peers responded in some form, so the group clears n>=3 on its
+    // own -- mean built from only the 2 real ratings, per step 1.
+    expect(c1.peer).toEqual({ status: "reported", mean: 5, n: 3 });
+    expect(c1.allColleagues).toBeNull();
   });
 
   it("shows 'insufficient_responses' as a status, never a bare number or dash, when merge still falls short", () => {
@@ -98,7 +118,7 @@ describe("computeRaterGroupComparison", () => {
     expect(c1.peer).toEqual({ status: "reported", mean: 5, n: 3 });
     expect(c1.allColleagues).toBeNull();
 
-    expect(c7.peer).toEqual({ status: "merged" });
+    expect(c7.peer).toEqual({ status: "insufficient_responses" });
     expect(c7.allColleagues).toEqual({ status: "insufficient_responses" });
   });
 
@@ -130,7 +150,7 @@ describe("computeRaterGroupComparison", () => {
     }));
     const rows = computeRaterGroupComparison(buildDataset({ raters: peers, responses }));
     const c7 = rows.find((r) => r.competencyNumber === 7)!;
-    expect(c7.peer).toEqual({ status: "merged" });
+    expect(c7.peer).toEqual({ status: "insufficient_responses" });
     expect(c7.allColleagues).toEqual({ status: "insufficient_responses" });
   });
 });

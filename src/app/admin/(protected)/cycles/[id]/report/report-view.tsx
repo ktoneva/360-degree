@@ -33,8 +33,9 @@ function ScoreCell({ cell, canMark }: { cell: ComparisonCell; canMark: boolean }
 
 function ColleagueTd({ cell }: { cell: ColleagueCell }) {
   if (cell.status === "reported") return <>{cell.mean}</>;
-  if (cell.status === "merged") return <span style={{ color: "var(--muted)", fontStyle: "italic" }}>Merged</span>;
-  return <>&mdash;</>;
+  if (cell.status === "insufficient_responses")
+    return <span style={{ color: "var(--muted)", fontStyle: "italic" }}>Insufficient responses</span>;
+  return <>&mdash;</>; // no_data: zero raters in this group for the cycle at all
 }
 
 function RangeBar({ range }: { range: { low: number; high: number; average: number } | null }) {
