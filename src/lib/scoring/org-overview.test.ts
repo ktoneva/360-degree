@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { computeOrgOverview, type OrgLeaderInput } from "./org-overview";
 import { ITEM_C1, buildDataset, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
-import type { ScoringItem } from "./types";
+import { ALL_RATER_GROUPS, type ScoringItem } from "./types";
 
 beforeEach(() => resetRaterCounter());
 
@@ -90,8 +90,8 @@ describe("computeOrgOverview", () => {
   });
 
   it("never blends competency 9 standard and ops -- reports two independent rows", () => {
-    const standardItem: ScoringItem = { id: "std-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false };
-    const opsItem: ScoringItem = { id: "ops-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false };
+    const standardItem: ScoringItem = { id: "std-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
+    const opsItem: ScoringItem = { id: "ops-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
 
     const peersStandard = makeRaters("peer", 3);
     const leaderStandard = makeLeader(
@@ -147,7 +147,7 @@ describe("computeOrgOverview", () => {
         ),
       );
     }
-    const opsItem: ScoringItem = { id: "ops-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false };
+    const opsItem: ScoringItem = { id: "ops-9-1", competencyNumber: 9, itemNumber: 1, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
     const opsPeer = makeRaters("peer", 1);
     leaders.push(
       makeLeader(

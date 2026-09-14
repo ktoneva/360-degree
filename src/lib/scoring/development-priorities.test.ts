@@ -9,7 +9,7 @@ import {
   makeRaters,
   resetRaterCounter,
 } from "./test-utils";
-import type { ScoringItem, ScoringNomination } from "./types";
+import { ALL_RATER_GROUPS, type ScoringItem, type ScoringNomination } from "./types";
 
 beforeEach(() => resetRaterCounter());
 
@@ -173,7 +173,7 @@ describe("computeDevelopmentPriorities", () => {
     let junkCounter = 0;
 
     for (let i = 1; i <= 12; i++) {
-      const realItem: ScoringItem = { id: `real-${i}`, competencyNumber: 1, itemNumber: i, isIntegrityItem: false };
+      const realItem: ScoringItem = { id: `real-${i}`, competencyNumber: 1, itemNumber: i, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
       items.push(realItem);
 
       const voterCount = 13 - i; // real-1 -> 12 voters, real-12 -> 1 voter
@@ -181,8 +181,8 @@ describe("computeDevelopmentPriorities", () => {
       raters.push(...voters);
       voters.forEach((v) => {
         junkCounter += 1;
-        const junkA: ScoringItem = { id: `junkA-${junkCounter}`, competencyNumber: 2, itemNumber: junkCounter, isIntegrityItem: false };
-        const junkB: ScoringItem = { id: `junkB-${junkCounter}`, competencyNumber: 3, itemNumber: junkCounter, isIntegrityItem: false };
+        const junkA: ScoringItem = { id: `junkA-${junkCounter}`, competencyNumber: 2, itemNumber: junkCounter, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
+        const junkB: ScoringItem = { id: `junkB-${junkCounter}`, competencyNumber: 3, itemNumber: junkCounter, isIntegrityItem: false, askedRaterGroups: ALL_RATER_GROUPS };
         items.push(junkA, junkB);
         nominations.push(...nominate(v.id, realItem.id, junkA.id, junkB.id));
       });
@@ -202,7 +202,7 @@ describe("computeDevelopmentPriorities", () => {
   it("excludes integrity items from eligibility even if somehow nominated", () => {
     const peers = makeRaters("peer", 3);
     const items: ScoringItem[] = [
-      { id: "safe-item", competencyNumber: 7, itemNumber: 5, isIntegrityItem: true },
+      { id: "safe-item", competencyNumber: 7, itemNumber: 5, isIntegrityItem: true, askedRaterGroups: ALL_RATER_GROUPS },
       ITEM_C1,
       ITEM_C1_B,
     ];

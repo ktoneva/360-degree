@@ -167,6 +167,7 @@ export async function buildTeamReportData(
           competencyNumber: i.competencyNumber,
           itemNumber: i.itemNumber,
           isIntegrityItem: i.isIntegrityItem,
+          askedRaterGroups: i.askedRaterGroups,
         })),
         raters: cycleRaters.map((r) => ({ id: r.id, group: r.group as RaterGroup })),
         responses: cycleResponses.map((r) => ({

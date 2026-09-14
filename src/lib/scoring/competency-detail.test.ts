@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { computeCompetencyDetailTables } from "./competency-detail";
-import { ITEM_C1, ITEM_C1_B, buildDataset, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
+import { ITEM_C1, ITEM_C1_B, buildDataset, itemFor, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
 
 beforeEach(() => resetRaterCounter());
 
@@ -87,6 +87,36 @@ describe("computeCompetencyDetailTables", () => {
     expect(item1.peer).toEqual({ status: "reported", mean: 2.7, n: 3 });
     expect(item1.directReport).toEqual({ status: "reported", mean: 2.7, n: 3 });
     expect(JSON.stringify(item1)).not.toContain("merged");
+  });
+
+  it("item row: shows a plain dash, never 'insufficient responses', when this item was never on that group's questionnaire at all (v15)", () => {
+    // Peers were never asked this item -- a genuine not-applicable, distinct
+    // from being asked and falling short of the 3-person threshold.
+    const item = itemFor("peer-not-asked", 1, 1, ["self", "manager", "direct_report"]);
+    const peers = makeRaters("peer", 3);
+    const directReports = makeRaters("direct_report", 3);
+    const responses = directReports.map((d) => scaleResponse(d.id, item.id, 4));
+    const [c1] = computeCompetencyDetailTables(
+      buildDataset({ items: [item], raters: [...peers, ...directReports], responses }),
+    );
+    const row = c1.items.find((i) => i.itemId === item.id)!;
+    expect(row.peer).toEqual({ status: "no_data" });
+    expect(row.directReport).toEqual({ status: "reported", mean: 4, n: 3 });
+  });
+
+  it("item row: the not-applicable dash applies consistently to direct_report and other too, not only peer", () => {
+    const item = itemFor("dr-and-other-not-asked", 1, 1, ["self", "manager", "peer"]);
+    const peers = makeRaters("peer", 3);
+    const directReports = makeRaters("direct_report", 3);
+    const others = makeRaters("other", 3);
+    const responses = peers.map((p) => scaleResponse(p.id, item.id, 5));
+    const [c1] = computeCompetencyDetailTables(
+      buildDataset({ items: [item], raters: [...peers, ...directReports, ...others], responses }),
+    );
+    const row = c1.items.find((i) => i.itemId === item.id)!;
+    expect(row.peer).toEqual({ status: "reported", mean: 5, n: 3 });
+    expect(row.directReport).toEqual({ status: "no_data" });
+    expect(row.other).toEqual({ status: "no_data" });
   });
 
   it("self and manager are always shown plainly regardless of n", () => {

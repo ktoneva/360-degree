@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CompetencyVariant } from "@/lib/types";
+import type { CompetencyVariant, RaterGroup } from "@/lib/types";
 import type { ScoringItem } from "@/lib/scoring";
 
 export interface CycleItem extends ScoringItem {
@@ -19,7 +19,9 @@ export async function getCycleItems(
 ): Promise<CycleItem[]> {
   const { data, error } = await supabase
     .from("items")
-    .select("id, item_number, behaviour_text, is_integrity_item, competencies(number, name, variant)");
+    .select(
+      "id, item_number, behaviour_text, is_integrity_item, asked_rater_groups, competencies(number, name, variant)",
+    );
 
   if (error) throw new Error(error.message);
 
@@ -45,6 +47,7 @@ export async function getCycleItems(
         itemNumber: row.item_number as number,
         behaviourText: row.behaviour_text as string,
         isIntegrityItem: row.is_integrity_item as boolean,
+        askedRaterGroups: row.asked_rater_groups as RaterGroup[],
       }),
     )
     .sort((a, b) => a.competencyNumber - b.competencyNumber || a.itemNumber - b.itemNumber);

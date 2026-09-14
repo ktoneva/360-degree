@@ -94,8 +94,11 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
         // group that clears that but has zero real ratings has nothing to
         // report and isn't short on responders either, so it's excluded from
         // both the safe list and the merge pool below, same as at competency
-        // level.
-        const existingItemGroups = MERGEABLE_GROUPS.filter((g) => ratersByGroup[g].length > 0);
+        // level. A group this item was never asked of at all is excluded
+        // here too -- that's a not-applicable, not an anonymity question.
+        const existingItemGroups = MERGEABLE_GROUPS.filter(
+          (g) => ratersByGroup[g].length > 0 && item.askedRaterGroups.includes(g),
+        );
         const safeGroups = existingItemGroups.filter(
           (g) => groupResults[g].respondentCount >= 3 && groupResults[g].mean !== null,
         );
@@ -112,7 +115,10 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
         }
 
         const colleagueCell = (group: MergeableGroup): ColleagueCell => {
+          // Applicability first, and stop there -- never run a group this
+          // item wasn't asked of through the n>=3-or-merge logic (v15).
           if (ratersByGroup[group].length === 0) return { status: "no_data" };
+          if (!item.askedRaterGroups.includes(group)) return { status: "no_data" };
           if (safeGroups.includes(group)) {
             return {
               status: "reported",

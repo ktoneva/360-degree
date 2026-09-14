@@ -20,6 +20,13 @@ export interface ScoringItem {
    * hidden strengths, competency overview, rater group comparison, or
    * development priorities. Reported only via the safeguarding integrity check. */
   isIntegrityItem: boolean;
+  /** Which rater groups this item is actually on the questionnaire for --
+   * self and manager typically see everything, peers/direct_reports/others
+   * each see a different subset (rater load varies by group). A group not
+   * in this list was never asked the item at all, which is a genuine
+   * not-applicable, never an anonymity suppression -- the 2 must render
+   * differently (v15). */
+  askedRaterGroups: RaterGroup[];
 }
 
 export interface ScoringRater {

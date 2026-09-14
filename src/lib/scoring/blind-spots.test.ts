@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { computeBlindSpots, computeHiddenStrengths } from "./blind-spots";
 import { ITEM_C1, buildDataset, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
-import type { ScoringItem } from "./types";
+import { ALL_RATER_GROUPS, type ScoringItem } from "./types";
 
 beforeEach(() => resetRaterCounter());
 
@@ -11,6 +11,7 @@ function itemBank(count: number): ScoringItem[] {
     competencyNumber: 1,
     itemNumber: i + 1,
     isIntegrityItem: false,
+    askedRaterGroups: ALL_RATER_GROUPS,
   }));
 }
 

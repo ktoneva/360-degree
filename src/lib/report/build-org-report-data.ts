@@ -131,6 +131,7 @@ export async function buildOrgReportData(
           competencyNumber: i.competencyNumber,
           itemNumber: i.itemNumber,
           isIntegrityItem: i.isIntegrityItem,
+          askedRaterGroups: i.askedRaterGroups,
         })),
         raters: cycleRaters.map((r) => ({ id: r.id, group: r.group as ScoringRaterGroup })),
         responses: cycleResponses.map((r) => ({

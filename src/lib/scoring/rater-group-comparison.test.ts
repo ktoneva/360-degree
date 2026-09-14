@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { computeRaterGroupComparison } from "./rater-group-comparison";
-import { ITEM_C1, ITEM_C7, buildDataset, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
+import { ITEM_C1, ITEM_C7, buildDataset, itemFor, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
 import type { ScoringResponse } from "./types";
 
 beforeEach(() => resetRaterCounter());
@@ -138,6 +138,46 @@ describe("computeRaterGroupComparison", () => {
     ];
     const rows = computeRaterGroupComparison(buildDataset({ raters: peers, responses }));
     expect(rows.map((r) => r.competencyNumber)).toEqual([1, 7]);
+  });
+
+  it("shows a plain dash, never 'insufficient responses', when a group was never asked this competency at all (v15)", () => {
+    // Peers exist and have raters, but this competency's only item never
+    // names "peer" in askedRaterGroups -- a genuine not-applicable, not a
+    // suppression, and it must not drag anyone else into a merge either.
+    const item = itemFor("not-for-peers", 1, 1, ["self", "manager", "direct_report"]);
+    const peers = makeRaters("peer", 3);
+    const directReports = makeRaters("direct_report", 3);
+    const responses = directReports.map((d) => scaleResponse(d.id, item.id, 5));
+    const [c1] = computeRaterGroupComparison(
+      buildDataset({ items: [item], raters: [...peers, ...directReports], responses }),
+    );
+    expect(c1.peer).toEqual({ status: "no_data" });
+    expect(c1.directReport).toEqual({ status: "reported", mean: 5, n: 3 });
+    // Peer's not-applicable status doesn't force a merge on direct_report.
+    expect(c1.allColleagues).toBeNull();
+  });
+
+  it("applies the not-applicable dash consistently to direct_report and other, not only peer", () => {
+    const item = itemFor("not-for-dr-or-other", 1, 1, ["self", "manager", "peer"]);
+    const peers = makeRaters("peer", 3);
+    const directReports = makeRaters("direct_report", 3);
+    const others = makeRaters("other", 3);
+    const responses = peers.map((p) => scaleResponse(p.id, item.id, 4));
+    const [c1] = computeRaterGroupComparison(
+      buildDataset({ items: [item], raters: [...peers, ...directReports, ...others], responses }),
+    );
+    expect(c1.peer).toEqual({ status: "reported", mean: 4, n: 3 });
+    expect(c1.directReport).toEqual({ status: "no_data" });
+    expect(c1.other).toEqual({ status: "no_data" });
+    expect(c1.allColleagues).toBeNull();
+  });
+
+  it("a group applicable to the competency but under 3 responders still shows 'insufficient responses', distinct from not-applicable", () => {
+    const item = itemFor("for-everyone", 1, 1, ["self", "manager", "peer"]);
+    const peers = makeRaters("peer", 2); // applicable, but under 3
+    const responses = peers.map((p) => scaleResponse(p.id, item.id, 4));
+    const [c1] = computeRaterGroupComparison(buildDataset({ items: [item], raters: peers, responses }));
+    expect(c1.peer).toEqual({ status: "insufficient_responses" });
   });
 
   it("excludes integrity items from the comparison entirely", () => {

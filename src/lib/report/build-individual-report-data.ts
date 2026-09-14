@@ -106,6 +106,7 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
       competencyNumber: i.competencyNumber,
       itemNumber: i.itemNumber,
       isIntegrityItem: i.isIntegrityItem,
+      askedRaterGroups: i.askedRaterGroups,
     })),
     raters: (raters ?? []).map((r) => ({ id: r.id as string, group: r.rater_group as RaterGroup })),
     responses: (responses ?? []).map((r) => ({
