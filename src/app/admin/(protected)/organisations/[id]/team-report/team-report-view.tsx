@@ -171,6 +171,8 @@ export function TeamReportView({
           <p style={{ fontSize: 13, lineHeight: 1.65 }}>
             Each competency page is a matrix: one row per item, one column per leader, using the
             team-wide (all others, excluding self) score for that leader on that item.
+            &lsquo;All others&rsquo; is the combined average of that leader&apos;s peers, direct
+            reports and others together, not a separate rater group.
           </p>
           <p style={{ fontSize: 13, lineHeight: 1.65 }}>
             A score of 4.25 or above is marked with a filled gold circle, a genuine team-wide

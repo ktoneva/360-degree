@@ -182,6 +182,11 @@ export function ReportView({ data }: { data: IndividualReportData }) {
             than treated as a neutral score.
           </p>
           <p style={{ fontSize: 13, lineHeight: 1.65 }}>
+            Peers, direct reports and others are shown as separate columns throughout.
+            &lsquo;All others&rsquo; is not a separate group, it is the combined average of those 3
+            groups together.
+          </p>
+          <p style={{ fontSize: 13, lineHeight: 1.65 }}>
             A score of 4.25 or above is marked with a filled gold circle, a strength worth naming. A
             score of 2.25 or below is marked with an outlined amber circle. Nothing in between is
             marked, colour is used sparingly so it means something when it appears.
@@ -291,7 +296,12 @@ export function ReportView({ data }: { data: IndividualReportData }) {
           <h2>Blind spots</h2>
           <p className="sub">Items where self exceeds the colleague average by 1.0 or more.</p>
           {data.blindSpots.length === 0 ? (
-            <p className="empty-note">No blind spots were identified this cycle.</p>
+            <p className="empty-note">
+              No item shows a full-point gap between your self-rating and your colleagues this
+              cycle. Pick the competency you feel least sure about, and ask 2 colleagues directly
+              what a 5 would look like there. Or ask your colleagues: &ldquo;What small tweak will
+              help me grow even faster in my career as a leader?&rdquo;
+            </p>
           ) : (
             <table className="plain-table">
               <thead>
@@ -324,7 +334,12 @@ export function ReportView({ data }: { data: IndividualReportData }) {
           <h2>Hidden strengths</h2>
           <p className="sub">Items where the colleague average exceeds self by 1.0 or more.</p>
           {data.hiddenStrengths.length === 0 ? (
-            <p className="empty-note">No hidden strengths were identified this cycle.</p>
+            <p className="empty-note">
+              No item shows your colleagues rating you a full point above your own self-rating
+              this cycle. Which strength do you rely on most without naming it as one? Ask a
+              colleague what they would call it. Or ask your colleagues: &ldquo;What do you like
+              about working with me?&rdquo;
+            </p>
           ) : (
             <table className="plain-table">
               <thead>
@@ -399,7 +414,11 @@ export function ReportView({ data }: { data: IndividualReportData }) {
             improved.&rdquo; Self and manager shown as separate flags.
           </p>
           {data.developmentPriorities.length === 0 ? (
-            <p className="empty-note">No development priorities were identified this cycle.</p>
+            <p className="empty-note">
+              No completed forced choice cleared the reporting threshold this cycle. Ask your
+              colleagues directly: if they could change one thing about how you lead, what would
+              it be?
+            </p>
           ) : (
             <table className="plain-table">
               <thead>
