@@ -41,17 +41,6 @@ async function getBrowser(): Promise<Browser> {
   return browser;
 }
 
-function parseCookieHeader(cookieHeader: string, url: string): { name: string; value: string; url: string }[] {
-  return cookieHeader
-    .split(";")
-    .map((pair) => pair.trim())
-    .filter(Boolean)
-    .map((pair) => {
-      const eq = pair.indexOf("=");
-      return { name: pair.slice(0, eq), value: pair.slice(eq + 1), url };
-    });
-}
-
 /**
  * Renders the given app URL to a PDF by having a real headless browser visit
  * it, rather than re-implementing the page's markup separately (Next.js
@@ -71,7 +60,14 @@ export async function renderUrlToPdf(url: string, cookieHeader: string | null): 
   const page = await browser.newPage();
   try {
     if (cookieHeader) {
-      await page.setCookie(...parseCookieHeader(cookieHeader, url));
+      // Forward the incoming request's Cookie header verbatim on every
+      // request this page makes, rather than reconstructing individual
+      // cookie objects (domain/secure/sameSite) via page.setCookie() --
+      // Supabase's session cookies are often chunked/base64 and easy to get
+      // subtly wrong that way, whereas this just replays exactly what the
+      // browser already sent, without Chrome's own cookie-jar policy code
+      // able to reject or drop any of it.
+      await page.setExtraHTTPHeaders({ Cookie: cookieHeader });
     }
     await page.goto(url, { waitUntil: "networkidle0" });
     if (new URL(page.url()).pathname === "/admin/login") {
