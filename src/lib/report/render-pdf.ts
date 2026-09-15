@@ -1,5 +1,11 @@
 import puppeteerCore, { type Browser } from "puppeteer-core";
 
+/** Distinct from any other failure (a Chromium launch crash, a navigation
+ * timeout, etc.) so callers can redirect to login only for this specific
+ * case, rather than masking every possible failure behind the same "you're
+ * not signed in" redirect. */
+export class NotAuthenticatedError extends Error {}
+
 declare global {
   // eslint-disable-next-line no-var
   var __reportPdfBrowser: Browser | undefined;
@@ -17,10 +23,13 @@ async function launchBrowser(): Promise<Browser> {
 
   if (isServerless) {
     const chromium = (await import("@sparticuz/chromium")).default;
+    // Matches @sparticuz/chromium's own documented usage exactly: its
+    // bundled binary is the headless-shell build, and "headless: true"
+    // (Chrome's newer full-headless mode) doesn't run on it.
     return puppeteerCore.launch({
-      args: chromium.args,
+      args: await puppeteerCore.defaultArgs({ args: chromium.args, headless: "shell" }),
       executablePath: await chromium.executablePath(),
-      headless: true,
+      headless: "shell",
     });
   }
 
@@ -71,7 +80,7 @@ export async function renderUrlToPdf(url: string, cookieHeader: string | null): 
     }
     await page.goto(url, { waitUntil: "networkidle0" });
     if (new URL(page.url()).pathname === "/admin/login") {
-      throw new Error("Not authenticated for PDF export");
+      throw new NotAuthenticatedError("Not authenticated for PDF export");
     }
     const pdf = await page.pdf({
       format: "A4",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminUser } from "@/lib/supabase/require-admin-user";
 import { buildTeamReportData } from "@/lib/report/build-team-report-data";
-import { renderUrlToPdf } from "@/lib/report/render-pdf";
+import { NotAuthenticatedError, renderUrlToPdf } from "@/lib/report/render-pdf";
 import { LEADER_LEVELS, type LeaderLevel } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -38,8 +38,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   let pdf: Buffer;
   try {
     pdf = await renderUrlToPdf(targetUrl, request.headers.get("cookie"));
-  } catch {
-    return NextResponse.redirect(new URL("/admin/login", request.url));
+  } catch (err) {
+    if (err instanceof NotAuthenticatedError) {
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+    console.error("PDF export failed", err);
+    const message = err instanceof Error ? err.message : String(err);
+    return new NextResponse(`PDF export failed: ${message}`, { status: 500 });
   }
 
   const filenameBase = `${data.organisationName}-${data.levelLabel}-team-report`.replace(/[^a-z0-9]+/gi, "-");
