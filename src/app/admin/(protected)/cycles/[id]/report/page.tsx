@@ -22,7 +22,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
         <Link href={`/admin/cycles/${id}`} className="text-sm text-zinc-500 hover:text-zinc-700">
           &larr; Back to cycle
         </Link>
-        <PrintButton />
+        <PrintButton href={`/admin/cycles/${id}/report/pdf`} />
       </div>
 
       <ReportView data={data} />

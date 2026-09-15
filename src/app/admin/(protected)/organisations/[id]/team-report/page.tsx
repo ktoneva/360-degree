@@ -57,7 +57,9 @@ export default async function TeamReportPage({
         <Link href={`/admin/organisations/${id}/team-report`} className="text-sm text-zinc-500 hover:text-zinc-700">
           &larr; Choose a different level
         </Link>
-        {data.leaders.length > 0 && <PrintButton />}
+        {data.leaders.length > 0 && (
+          <PrintButton href={`/admin/organisations/${id}/team-report/pdf?level=${level}`} />
+        )}
       </div>
 
       {data.leaders.length === 0 ? (
