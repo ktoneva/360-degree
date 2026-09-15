@@ -12,6 +12,13 @@ export type MergeableGroup = "peer" | "direct_report" | "other";
 
 export const MERGEABLE_GROUPS: MergeableGroup[] = ["peer", "direct_report", "other"];
 
+/** The platform-wide anonymity threshold (Design decisions, row 10): a
+ * colleague group's figure is shown once this many distinct people have
+ * responded. Every cycle uses this unless it has a documented, named
+ * ScoringDataset.anonymityThreshold override (row 25) -- never a setting an
+ * admin can change in the ordinary cycle-creation flow. */
+export const STANDARD_ANONYMITY_THRESHOLD = 3;
+
 export interface ScoringItem {
   id: string;
   competencyNumber: number;
@@ -64,4 +71,10 @@ export interface ScoringDataset {
   raters: ScoringRater[];
   responses: ScoringResponse[];
   nominations: ScoringNomination[];
+  /** Overrides STANDARD_ANONYMITY_THRESHOLD for this cycle's report only.
+   * Undefined/null means the standard threshold applies -- this field exists
+   * for a single documented, one-off exception (Design decisions, row 25),
+   * never a general setting, and is never populated from anything an admin
+   * can set in the ordinary cycle-creation flow. */
+  anonymityThreshold?: number | null;
 }

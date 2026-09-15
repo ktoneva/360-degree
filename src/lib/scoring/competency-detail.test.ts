@@ -119,6 +119,27 @@ describe("computeCompetencyDetailTables", () => {
     expect(row.other).toEqual({ status: "no_data" });
   });
 
+  it("item row: a documented anonymityThreshold override lets a smaller group report its own mean (Design decisions row 25)", () => {
+    const peers = makeRaters("peer", 2); // under the standard n>=3
+    const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 5), scaleResponse(peers[1].id, ITEM_C1.id, 3)];
+    const [c1] = computeCompetencyDetailTables(
+      buildDataset({ raters: peers, responses, anonymityThreshold: 2 }),
+    );
+    const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
+    expect(item1.peer).toEqual({ status: "reported", mean: 4, n: 2 });
+    // Also feeds the shared item-level "all others" figure used across the
+    // report (Design decision 21) -- not just this one column.
+    expect(item1.allOthers).toEqual({ status: "reported", mean: 4, n: 2 });
+  });
+
+  it("item row: the same data without the override still shows insufficient responses", () => {
+    const peers = makeRaters("peer", 2);
+    const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 5), scaleResponse(peers[1].id, ITEM_C1.id, 3)];
+    const [c1] = computeCompetencyDetailTables(buildDataset({ raters: peers, responses }));
+    const item1 = c1.items.find((i) => i.itemId === ITEM_C1.id)!;
+    expect(item1.peer).toEqual({ status: "insufficient_responses" });
+  });
+
   it("self and manager are always shown plainly regardless of n", () => {
     const self = makeRaters("self", 1);
     const responses = [scaleResponse(self[0].id, ITEM_C1.id, 3)];

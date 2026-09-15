@@ -1,4 +1,11 @@
-import { MERGEABLE_GROUPS, type MergeableGroup, type RaterGroup, type ScoringRater, type ScoringResponse } from "./types";
+import {
+  MERGEABLE_GROUPS,
+  STANDARD_ANONYMITY_THRESHOLD,
+  type MergeableGroup,
+  type RaterGroup,
+  type ScoringRater,
+  type ScoringResponse,
+} from "./types";
 
 /** Rounds to 1 decimal place for display. Never use this before a threshold test. */
 export function round1(value: number): number {
@@ -105,14 +112,21 @@ export function competencyGroupMean(
 
 /**
  * Item-level "all others" mean per the Blind spots logic tab (steps 3-5):
- * peer/direct_report/other each report separately if they clear n>=3
- * *responders* on this item — a real rating or "not able to comment" both
- * count (step 3, v15) — groups that don't are pooled into a single "all
- * colleagues" figure, which itself must clear n>=3 responders to count. The
- * final mean averages the *group-level* means that cleared the bar, each
- * counted once — never a straight pooled average of every individual rater,
- * and always built only from real ratings regardless of how the threshold
- * was cleared. Manager is never included, in either direction (step 10).
+ * peer/direct_report/other each report separately if they clear the
+ * threshold's *responders* on this item — a real rating or "not able to
+ * comment" both count (step 3, v15) — groups that don't are pooled into a
+ * single "all colleagues" figure, which itself must clear the threshold to
+ * count. The final mean averages the *group-level* means that cleared the
+ * bar, each counted once — never a straight pooled average of every
+ * individual rater, and always built only from real ratings regardless of
+ * how the threshold was cleared. Manager is never included, in either
+ * direction (step 10).
+ *
+ * `threshold` defaults to the standard n>=3 and should only ever be anything
+ * else for a cycle carrying a documented, one-off ScoringDataset.anonymity
+ * Threshold override (Design decisions, row 25) — callers pass that value
+ * through explicitly rather than this function reaching for it itself, so
+ * every call site stays an obvious, greppable place the override applies.
  */
 export interface ItemAllOthersResult {
   mean: number | null;
@@ -125,6 +139,7 @@ export function itemAllOthersMean(
   responses: ScoringResponse[],
   itemId: string,
   ratersByGroup: Record<RaterGroup, string[]>,
+  threshold: number = STANDARD_ANONYMITY_THRESHOLD,
 ): ItemAllOthersResult {
   const reportableMeans: number[] = [];
   let totalRealRatings = 0;
@@ -136,7 +151,7 @@ export function itemAllOthersMean(
     // real ratings (e.g. 3 people all said "not able to comment") — nothing
     // to report in that rare case, and nothing to merge either, since the
     // group genuinely isn't short on responders.
-    if (respondentCount >= 3) {
+    if (respondentCount >= threshold) {
       if (mean !== null) {
         reportableMeans.push(mean);
         totalRealRatings += n;
@@ -149,7 +164,7 @@ export function itemAllOthersMean(
   if (needsMerge.length > 0) {
     const mergedRaterIds = needsMerge.flatMap((g) => ratersByGroup[g]);
     const merged = itemGroupMean(responses, itemId, mergedRaterIds);
-    if (merged.respondentCount >= 3 && merged.mean !== null) {
+    if (merged.respondentCount >= threshold && merged.mean !== null) {
       reportableMeans.push(merged.mean);
       totalRealRatings += merged.n;
     }

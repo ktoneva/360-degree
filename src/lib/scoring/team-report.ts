@@ -95,7 +95,12 @@ export function computeTeamMatrix(leaders: TeamLeaderInput[]): TeamCompetencyMat
 
     const items: TeamMatrixItemRow[] = orderedItemIds.map(([itemId, itemNumber]) => {
       const cells: TeamMatrixCell[] = perLeader.map((l) => {
-        const allOthersResult = itemAllOthersMean(l.dataset.responses, itemId, l.ratersByGroup);
+        const allOthersResult = itemAllOthersMean(
+          l.dataset.responses,
+          itemId,
+          l.ratersByGroup,
+          l.dataset.anonymityThreshold ?? undefined,
+        );
         const selfResult = itemGroupMean(l.dataset.responses, itemId, l.ratersByGroup.self);
         const allOthers = allOthersResult.mean;
         const self = selfResult.mean;

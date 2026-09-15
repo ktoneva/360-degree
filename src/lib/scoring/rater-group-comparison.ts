@@ -1,4 +1,4 @@
-import { MERGEABLE_GROUPS, type MergeableGroup } from "./types";
+import { MERGEABLE_GROUPS, STANDARD_ANONYMITY_THRESHOLD, type MergeableGroup } from "./types";
 import { competencyGroupMean, groupRatersByGroup, round1, type CompetencyGroupStats } from "./means";
 import type { ScoringDataset } from "./types";
 
@@ -44,19 +44,24 @@ function toGroupCell(stats: CompetencyGroupStats): ComparisonCell {
  * own column, never merged or suppressed. For peer/direct report/other, the
  * applicability check (v15) runs first and stops there: a group never asked
  * any item in this competency at all shows a plain dash and never enters the
- * n>=3-or-merge logic below. Only *then* are the applicable groups merged
- * whenever they fall under n>=3 *responders* for that competency's items — a
- * real rating or "not able to comment" both count toward that (step 2),
- * though the mean itself still only ever averages real ratings. A merged
- * group's own cell shows the exact same resolved figure as allColleagues (a
- * real pooled mean, or "insufficient responses" if the pool is still under
- * 3) — never a bare internal status. A group with zero raters invited to the
- * cycle at all is likewise left out of the merge decision entirely (see
- * `existingGroups` below).
+ * threshold-or-merge logic below. Only *then* are the applicable groups
+ * merged whenever they fall under the threshold's *responders* for that
+ * competency's items — a real rating or "not able to comment" both count
+ * toward that (step 2), though the mean itself still only ever averages real
+ * ratings. A merged group's own cell shows the exact same resolved figure as
+ * allColleagues (a real pooled mean, or "insufficient responses" if the pool
+ * is still under threshold) — never a bare internal status. A group with
+ * zero raters invited to the cycle at all is likewise left out of the merge
+ * decision entirely (see `existingGroups` below). The threshold is the
+ * standard n>=3 unless this dataset carries a documented, one-off override
+ * (Design decisions, row 25).
  */
 export function computeRaterGroupComparison(dataset: ScoringDataset): CompetencyComparisonRow[] {
   const ratersByGroup = groupRatersByGroup(dataset.raters);
   const scoredItems = dataset.items.filter((i) => !i.isIntegrityItem);
+  // Standard n>=3 for every cycle except one carrying a documented, one-off
+  // ScoringDataset.anonymityThreshold override (Design decisions, row 25).
+  const threshold = dataset.anonymityThreshold ?? STANDARD_ANONYMITY_THRESHOLD;
   const competencyNumbers = [...new Set(scoredItems.map((i) => i.competencyNumber))].sort(
     (a, b) => a - b,
   );
@@ -94,7 +99,7 @@ export function computeRaterGroupComparison(dataset: ScoringDataset): Competency
       (g) => ratersByGroup[g].length > 0 && groupAskedInCompetency(g),
     );
     const safeGroups = existingGroups.filter(
-      (g) => groupStats[g].respondentCount >= 3 && groupStats[g].mean !== null,
+      (g) => groupStats[g].respondentCount >= threshold && groupStats[g].mean !== null,
     );
     const groupsToMerge = existingGroups.filter((g) => !safeGroups.includes(g));
 
@@ -104,7 +109,7 @@ export function computeRaterGroupComparison(dataset: ScoringDataset): Competency
       const mergedRaterIds = groupsToMerge.flatMap((g) => ratersByGroup[g]);
       const mergedStats = competencyGroupMean(dataset.responses, itemIds, mergedRaterIds);
       const resolved: ComparisonCell =
-        mergedStats.respondentCount >= 3 && mergedStats.mean !== null
+        mergedStats.respondentCount >= threshold && mergedStats.mean !== null
           ? { status: "reported", mean: round1(mergedStats.mean), n: mergedStats.respondentCount }
           : { status: "insufficient_responses" };
       allColleagues = resolved;

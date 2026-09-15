@@ -1,5 +1,5 @@
 import { itemAllOthersMean, groupRatersByGroup, round1 } from "./means";
-import type { ScoringDataset } from "./types";
+import { STANDARD_ANONYMITY_THRESHOLD, type ScoringDataset } from "./types";
 
 export interface RankedItemMean {
   itemId: string;
@@ -44,10 +44,11 @@ function strip({ itemId, competencyNumber, itemNumber, allOthersMean }: RankedIn
 export function computeHighestLowestItems(dataset: ScoringDataset): HighestLowestItems {
   const ratersByGroup = groupRatersByGroup(dataset.raters);
   const scoredItems = dataset.items.filter((i) => !i.isIntegrityItem);
+  const threshold = dataset.anonymityThreshold ?? STANDARD_ANONYMITY_THRESHOLD;
 
   const ranked: RankedInternal[] = [];
   for (const item of scoredItems) {
-    const result = itemAllOthersMean(dataset.responses, item.id, ratersByGroup);
+    const result = itemAllOthersMean(dataset.responses, item.id, ratersByGroup, threshold);
     if (result.mean === null) continue;
     ranked.push({
       itemId: item.id,

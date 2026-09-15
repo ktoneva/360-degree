@@ -128,6 +128,7 @@ const REPORT_STYLES = `
 .report-root .plan-section { font-weight: 600; font-size: 12.5px; color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 6px; margin-bottom: 8px; margin-top: 20px; }
 .report-root .plan-box { height: 42px; border: 1px dashed var(--line); border-radius: 4px; margin-bottom: 8px; }
 .report-root .empty-note { font-size: 12.5px; color: var(--muted); font-style: italic; }
+.report-root .anonymity-notice { font-size: 12.5px; line-height: 1.6; color: var(--ink); background: var(--gap-bg); border-left: 3px solid var(--amber); border-radius: 4px; padding: 10px 14px; margin: 0 0 16px; }
 
 @media print {
   body { background: #fff !important; }
@@ -176,6 +177,13 @@ export function ReportView({ data }: { data: IndividualReportData }) {
         <div className="inner">
           <h2>How to read this report</h2>
           <p className="sub">A short guide before the detail.</p>
+          {data.anonymityOverrideNotice && (
+            <p className="anonymity-notice">
+              Some colleague figures in this report are based on fewer responses than the
+              standard minimum for this platform, given a limited group of available raters.
+              Please bear this in mind when reading the results.
+            </p>
+          )}
           <p style={{ fontSize: 13, lineHeight: 1.65 }}>
             Every item is rated on a 5-point scale: almost never, rarely, sometimes, usually, almost
             always, plus &ldquo;not able to comment,&rdquo; which is excluded from every average rather

@@ -180,6 +180,44 @@ describe("computeRaterGroupComparison", () => {
     expect(c1.peer).toEqual({ status: "insufficient_responses" });
   });
 
+  it("a documented anonymityThreshold override lets a smaller group report on its own (one-off exception, Design decisions row 25)", () => {
+    const peers = makeRaters("peer", 2); // under the standard n>=3
+    const responses = peers.map((p) => scaleResponse(p.id, ITEM_C1.id, 4));
+    const [c1] = computeRaterGroupComparison(
+      buildDataset({ raters: peers, responses, anonymityThreshold: 2 }),
+    );
+    expect(c1.peer).toEqual({ status: "reported", mean: 4, n: 2 });
+    expect(c1.allColleagues).toBeNull();
+  });
+
+  it("the exact same data without the override still shows insufficient responses (the override is per-dataset, not global)", () => {
+    const peers = makeRaters("peer", 2);
+    const responses = peers.map((p) => scaleResponse(p.id, ITEM_C1.id, 4));
+    const [c1] = computeRaterGroupComparison(buildDataset({ raters: peers, responses }));
+    expect(c1.peer).toEqual({ status: "insufficient_responses" });
+  });
+
+  it("a lowered threshold still suppresses a group that falls short of even that lower bar", () => {
+    const peers = makeRaters("peer", 1); // under n>=2 as well as n>=3
+    const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 4)];
+    const [c1] = computeRaterGroupComparison(
+      buildDataset({ raters: peers, responses, anonymityThreshold: 2 }),
+    );
+    expect(c1.peer).toEqual({ status: "insufficient_responses" });
+  });
+
+  it("a not-applicable group still shows a plain dash under a lowered threshold, never resolved into a number", () => {
+    const item = itemFor("not-for-peers", 1, 1, ["self", "manager", "direct_report"]);
+    const peers = makeRaters("peer", 2);
+    const directReports = makeRaters("direct_report", 2);
+    const responses = directReports.map((d) => scaleResponse(d.id, item.id, 5));
+    const [c1] = computeRaterGroupComparison(
+      buildDataset({ items: [item], raters: [...peers, ...directReports], responses, anonymityThreshold: 2 }),
+    );
+    expect(c1.peer).toEqual({ status: "no_data" });
+    expect(c1.directReport).toEqual({ status: "reported", mean: 5, n: 2 });
+  });
+
   it("excludes integrity items from the comparison entirely", () => {
     const peers = makeRaters("peer", 3);
     const responses: ScoringResponse[] = peers.map((p) => ({

@@ -166,6 +166,19 @@ describe("itemAllOthersMean", () => {
     expect(result).toEqual({ mean: null, totalRealRatings: 0 });
   });
 
+  it("an explicit threshold argument lets a smaller group report (one-off anonymity exception, Design decisions row 25)", () => {
+    const peers = makeRaters("peer", 2); // under the standard n>=3
+    const responses = [scaleResponse(peers[0].id, ITEM_C1.id, 6), scaleResponse(peers[1].id, ITEM_C1.id, 4)];
+    const ratersByGroup = groupRatersByGroup(peers);
+
+    const atStandard = itemAllOthersMean(responses, ITEM_C1.id, ratersByGroup);
+    expect(atStandard.mean).toBeNull(); // 2 people, standard n>=3 not met
+
+    const withOverride = itemAllOthersMean(responses, ITEM_C1.id, ratersByGroup, 2);
+    expect(withOverride.mean).toBe(5);
+    expect(withOverride.totalRealRatings).toBe(2);
+  });
+
   it("a group of 3 clears the threshold even when one member said 'not able to comment' (v15)", () => {
     // The exact scenario that surfaced the "Merged" bug: 3 peers is enough on
     // its own, but the old count excluded the not-able-to-comment peer and

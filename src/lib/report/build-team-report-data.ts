@@ -94,7 +94,9 @@ export async function buildTeamReportData(
 
   const { data: cycles, error: cyclesError } = await supabase
     .from("review_cycles")
-    .select("id, competency_9_variant, period_start, period_end, review_subjects(full_name)")
+    .select(
+      "id, competency_9_variant, period_start, period_end, anonymity_threshold_override, review_subjects(full_name)",
+    )
     .eq("organisation_id", organisationId)
     .eq("level", level)
     // Only cycles manually marked complete ever feed this report -- an open
@@ -177,6 +179,11 @@ export async function buildTeamReportData(
           integrityValue: r!.integrity_value as "yes" | "no" | "not_observed" | null,
         })),
         nominations: [],
+        // Carries a leader's own documented, one-off anonymity override
+        // (Design decisions, row 25) into the team report too, so the same
+        // leader's figures aren't held to a different standard depending on
+        // which report they appear in. Null/undefined for every ordinary cycle.
+        anonymityThreshold: cycle.anonymity_threshold_override as number | null,
       },
     };
   });

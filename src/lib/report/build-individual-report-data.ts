@@ -29,6 +29,11 @@ export interface IndividualReportData {
   /** ISO date string, or null if the cycle hasn't been marked complete --
    * the caller decides whether that means "not ready to report" at all. */
   completedAt: string | null;
+  /** True only when this cycle carries a documented, one-off anonymity
+   * threshold override (Design decisions, row 25) -- tells the report to
+   * show the standard disclosure that some colleague figures rest on fewer
+   * responses than the platform minimum. Never true for an ordinary cycle. */
+  anonymityOverrideNotice: boolean;
   competencyTables: ReportCompetencyTable[];
   blindSpots: (GapItemResult & { behaviourText: string; competencyName: string })[];
   hiddenStrengths: (GapItemResult & { behaviourText: string; competencyName: string })[];
@@ -52,12 +57,14 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
   const { data: cycle, error: cycleError } = await supabase
     .from("review_cycles")
     .select(
-      "competency_9_variant, completed_at, review_subjects(full_name, role_title), organisations(name)",
+      "competency_9_variant, completed_at, anonymity_threshold_override, review_subjects(full_name, role_title), organisations(name)",
     )
     .eq("id", cycleId)
     .maybeSingle();
   if (cycleError) throw new Error(cycleError.message);
   if (!cycle) return null;
+
+  const anonymityThreshold = cycle.anonymity_threshold_override as number | null;
 
   const subject = Array.isArray(cycle.review_subjects) ? cycle.review_subjects[0] : cycle.review_subjects;
   const organisation = Array.isArray(cycle.organisations) ? cycle.organisations[0] : cycle.organisations;
@@ -119,6 +126,7 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
       raterId: n.rater_id as string,
       itemId: n.item_id as string,
     })),
+    anonymityThreshold,
   };
 
   function meta(itemId: string): CycleItem {
@@ -132,6 +140,7 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
     roleTitle: subject?.role_title ?? null,
     organisationName: organisation?.name ?? null,
     completedAt: cycle.completed_at,
+    anonymityOverrideNotice: anonymityThreshold != null && anonymityThreshold < 3,
 
     competencyTables: computeCompetencyDetailTables(dataset).map((table) => ({
       ...table,

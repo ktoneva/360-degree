@@ -5,7 +5,7 @@ import {
   type ColleagueCell,
   type ComparisonCell,
 } from "./rater-group-comparison";
-import { MERGEABLE_GROUPS, type MergeableGroup, type ScoringDataset } from "./types";
+import { MERGEABLE_GROUPS, STANDARD_ANONYMITY_THRESHOLD, type MergeableGroup, type ScoringDataset } from "./types";
 
 export interface CompetencyDetailItemRow {
   itemId: string;
@@ -65,6 +65,9 @@ function toCell(mean: number | null, n: number): ComparisonCell {
 export function computeCompetencyDetailTables(dataset: ScoringDataset): CompetencyDetailTable[] {
   const ratersByGroup = groupRatersByGroup(dataset.raters);
   const scoredItems = dataset.items.filter((i) => !i.isIntegrityItem);
+  // Standard n>=3 for every cycle except one carrying a documented, one-off
+  // ScoringDataset.anonymityThreshold override (Design decisions, row 25).
+  const threshold = dataset.anonymityThreshold ?? STANDARD_ANONYMITY_THRESHOLD;
   const comparisonByCompetency = new Map(
     computeRaterGroupComparison(dataset).map((row) => [row.competencyNumber, row]),
   );
@@ -83,7 +86,7 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
       .map((item): CompetencyDetailItemRow => {
         const selfResult = itemGroupMean(dataset.responses, item.id, ratersByGroup.self);
         const managerResult = itemGroupMean(dataset.responses, item.id, ratersByGroup.manager);
-        const allOthers = itemAllOthersMean(dataset.responses, item.id, ratersByGroup);
+        const allOthers = itemAllOthersMean(dataset.responses, item.id, ratersByGroup, threshold);
 
         const groupResults: Record<MergeableGroup, ReturnType<typeof itemGroupMean>> = {
           peer: itemGroupMean(dataset.responses, item.id, ratersByGroup.peer),
@@ -100,7 +103,7 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
           (g) => ratersByGroup[g].length > 0 && item.askedRaterGroups.includes(g),
         );
         const safeGroups = existingItemGroups.filter(
-          (g) => groupResults[g].respondentCount >= 3 && groupResults[g].mean !== null,
+          (g) => groupResults[g].respondentCount >= threshold && groupResults[g].mean !== null,
         );
         const groupsToMerge = existingItemGroups.filter((g) => !safeGroups.includes(g));
 
@@ -109,7 +112,7 @@ export function computeCompetencyDetailTables(dataset: ScoringDataset): Competen
           const mergedRaterIds = groupsToMerge.flatMap((g) => ratersByGroup[g]);
           const merged = itemGroupMean(dataset.responses, item.id, mergedRaterIds);
           pooledCell =
-            merged.respondentCount >= 3 && merged.mean !== null
+            merged.respondentCount >= threshold && merged.mean !== null
               ? { status: "reported", mean: round1(merged.mean), n: merged.respondentCount }
               : { status: "insufficient_responses" };
         }

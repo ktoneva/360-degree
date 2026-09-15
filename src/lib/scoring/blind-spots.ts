@@ -1,5 +1,5 @@
 import { itemAllOthersMean, itemGroupMean, groupRatersByGroup, round1 } from "./means";
-import type { ScoringDataset } from "./types";
+import { STANDARD_ANONYMITY_THRESHOLD, type ScoringDataset } from "./types";
 
 export interface GapItemResult {
   itemId: string;
@@ -16,6 +16,7 @@ type Direction = "blind_spot" | "hidden_strength";
 function computeGapItems(dataset: ScoringDataset, direction: Direction, cap: number | null): GapItemResult[] {
   const ratersByGroup = groupRatersByGroup(dataset.raters);
   const scoredItems = dataset.items.filter((i) => !i.isIntegrityItem);
+  const threshold = dataset.anonymityThreshold ?? STANDARD_ANONYMITY_THRESHOLD;
 
   const candidates: (GapItemResult & { rawGap: number; totalRealRatings: number })[] = [];
 
@@ -28,7 +29,7 @@ function computeGapItems(dataset: ScoringDataset, direction: Direction, cap: num
     if (selfResult.n === 0) continue;
     const selfMean = selfResult.mean!;
 
-    const allOthers = itemAllOthersMean(dataset.responses, item.id, ratersByGroup);
+    const allOthers = itemAllOthersMean(dataset.responses, item.id, ratersByGroup, threshold);
     if (allOthers.mean === null) continue;
 
     const rawGap = direction === "blind_spot" ? selfMean - allOthers.mean : allOthers.mean - selfMean;
