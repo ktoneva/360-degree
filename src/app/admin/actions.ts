@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminUser } from "@/lib/supabase/require-admin-user";
 import { LEADER_LEVELS } from "@/lib/types";
-import type { CompetencyVariant, CycleStatus, LeaderLevel, RaterGroup } from "@/lib/types";
+import type { CompetencyVariant, CycleStatus, LeaderLevel, RaterGroup, TeamReportLevel } from "@/lib/types";
 import type { ActionState } from "@/lib/action-state";
 
 const UNEXPECTED_ERROR = "Something went wrong. Please try again.";
@@ -395,7 +395,7 @@ const NOTE_CARDS = ["strengths", "gaps", "stretch", "development"] as const;
 
 export async function saveTeamReportNote(
   organisationId: string,
-  level: LeaderLevel,
+  level: TeamReportLevel,
   card: (typeof NOTE_CARDS)[number],
   position: 1 | 2,
   who: string,

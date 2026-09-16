@@ -7,6 +7,7 @@ import {
   type RaterGroup as ScoringRaterGroup,
 } from "@/lib/scoring";
 import { getCycleItems, type CycleItem } from "./get-cycle-items";
+import { fetchAllRows } from "./fetch-all-rows";
 
 export interface OrgReportData {
   organisationName: string;
@@ -81,35 +82,40 @@ export async function buildOrgReportData(
   }
 
   const cycleIds = cycles.map((c) => c.id);
-  const { data: raters, error: ratersError } = await supabase
-    .from("raters")
-    .select("id, review_cycle_id, rater_group")
-    .in("review_cycle_id", cycleIds)
-    .is("archived_at", null);
-  if (ratersError) throw new Error(ratersError.message);
+  const raters = await fetchAllRows<{ id: string; review_cycle_id: string; rater_group: string }>((from, to) =>
+    supabase
+      .from("raters")
+      .select("id, review_cycle_id, rater_group")
+      .in("review_cycle_id", cycleIds)
+      .is("archived_at", null)
+      .range(from, to),
+  );
 
-  const raterIds = (raters ?? []).map((r) => r.id as string);
-  const { data: responses, error: responsesError } =
+  const raterIds = raters.map((r) => r.id);
+  const responses =
     raterIds.length === 0
-      ? { data: [], error: null }
-      : await supabase
-          .from("responses")
-          .select("rater_id, item_id, scale_value, integrity_value")
-          .in("rater_id", raterIds);
-  if (responsesError) throw new Error(responsesError.message);
+      ? []
+      : await fetchAllRows<{ rater_id: string; item_id: string; scale_value: number | null; integrity_value: string | null }>(
+          (from, to) =>
+            supabase
+              .from("responses")
+              .select("rater_id, item_id, scale_value, integrity_value")
+              .in("rater_id", raterIds)
+              .range(from, to),
+        );
 
   const ratersByCycle = new Map<string, { id: string; group: string }[]>();
-  for (const r of raters ?? []) {
-    const list = ratersByCycle.get(r.review_cycle_id as string) ?? [];
-    list.push({ id: r.id as string, group: r.rater_group as string });
-    ratersByCycle.set(r.review_cycle_id as string, list);
+  for (const r of raters) {
+    const list = ratersByCycle.get(r.review_cycle_id) ?? [];
+    list.push({ id: r.id, group: r.rater_group });
+    ratersByCycle.set(r.review_cycle_id, list);
   }
 
   const responsesByRater = new Map<string, typeof responses>();
-  for (const resp of responses ?? []) {
-    const list = responsesByRater.get(resp.rater_id as string) ?? [];
+  for (const resp of responses) {
+    const list = responsesByRater.get(resp.rater_id) ?? [];
     list.push(resp);
-    responsesByRater.set(resp.rater_id as string, list);
+    responsesByRater.set(resp.rater_id, list);
   }
 
   const leaders: OrgLeaderInput[] = cycles.map((cycle) => {

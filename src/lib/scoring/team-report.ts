@@ -2,6 +2,11 @@ import { itemAllOthersMean, itemGroupMean, groupRatersByGroup } from "./means";
 import { computeHiddenStrengths, computeBlindSpots } from "./blind-spots";
 import type { ScoringDataset } from "./types";
 
+/** Deliberately a local type, not imported from the app's CompetencyVariant
+ * -- this module stays independent of the Supabase schema and the UI, same
+ * as the rest of src/lib/scoring (see org-overview.ts's OrgCompetency9Variant). */
+export type TeamCompetency9Variant = "standard" | "ops";
+
 export type TeamItemAggregate =
   | { mode: "separate"; mean: number; leaderCount: number }
   | { mode: "merged"; mean: number; leaderCount: number; respondentCount: number }
@@ -12,6 +17,11 @@ export interface TeamLeaderInput {
   /** This leader's own complete dataset -- items already reflect their own
    * competency9Variant, exactly as for the individual report. */
   dataset: ScoringDataset;
+  /** Which competency-9 variant this leader's cycle used. Competencies 1-8
+   * are unaffected; the 2 variants measure different constructs for #9, so
+   * they're never pooled into the same matrix (Team report logic, step 3)
+   * even when the leader pool itself is a combined group like SLT. */
+  competency9Variant: TeamCompetency9Variant;
 }
 
 export interface TeamMatrixCell {
@@ -45,6 +55,9 @@ export interface TeamGapInsight {
 
 export interface TeamCompetencyMatrix {
   competencyNumber: number;
+  /** Set only for competencyNumber === 9, to say which of the (possibly 2)
+   * matrices this is when the leader pool spans both variants. */
+  competency9Variant?: TeamCompetency9Variant;
   items: TeamMatrixItemRow[];
   /** Single highest matrix cell in this competency clearing 4.25. Null means
    * no cell qualifies -- show a reflection prompt instead. */
@@ -59,15 +72,18 @@ const GAP_THRESHOLD = 1.0;
 const HIGH_THRESHOLD = 4.25;
 
 /**
- * One matrix per competency (Team report template section 4-12): rows are
- * items, columns are leaders, each cell is that leader's own existing
- * item-level "all others" figure -- not a cross-leader blend. The 2 insight
- * cards scan those same raw cells (plus each leader's own self value) for a
- * single standout finding; they do not aggregate across leaders either, per
- * the Team report logic tab (steps 4-5 describe finding "the single
- * highest-scoring cell" / "the single largest gap", not a team mean).
+ * One matrix per competency (Team report template section 4-12) for the
+ * given leaders: rows are items, columns are leaders, each cell is that
+ * leader's own existing item-level "all others" figure -- not a cross-leader
+ * blend. The 2 insight cards scan those same raw cells (plus each leader's
+ * own self value) for a single standout finding; they do not aggregate
+ * across leaders either, per the Team report logic tab (steps 4-5 describe
+ * finding "the single highest-scoring cell" / "the single largest gap", not
+ * a team mean). Assumes every leader passed in shares the same competency-9
+ * item set -- callers with a mixed-variant pool must split by variant first
+ * (see computeTeamMatrix, which calls this once per variant for competency 9).
  */
-export function computeTeamMatrix(leaders: TeamLeaderInput[]): TeamCompetencyMatrix[] {
+function computeMatricesForLeaders(leaders: TeamLeaderInput[]): TeamCompetencyMatrix[] {
   const perLeader = leaders.map((leader) => {
     const ratersByGroup = groupRatersByGroup(leader.dataset.raters);
     const scoredItems = leader.dataset.items.filter((i) => !i.isIntegrityItem);
@@ -125,6 +141,31 @@ export function computeTeamMatrix(leaders: TeamLeaderInput[]): TeamCompetencyMat
 
     return { competencyNumber, items, strengthInsight, gapInsight };
   });
+}
+
+/**
+ * Competencies 1-8 are identical regardless of a leader's own competency-9
+ * variant, so they're computed once across the full pool. Competency 9 never
+ * blends the standard and ops variants (Team report logic, step 3) -- when
+ * the pool spans both (only possible for a combined group like SLT), it gets
+ * 2 independent matrices instead of 1, each built only from the leaders who
+ * used that version, with its own insight cards. The common case (every
+ * leader on the same variant, true for every single-level report today)
+ * still produces exactly 1 competency-9 matrix, unchanged.
+ */
+export function computeTeamMatrix(leaders: TeamLeaderInput[]): TeamCompetencyMatrix[] {
+  const matricesExcl9 = computeMatricesForLeaders(leaders).filter((m) => m.competencyNumber !== 9);
+
+  const variantsPresent = [...new Set(leaders.map((l) => l.competency9Variant))];
+  const competency9Matrices = variantsPresent
+    .map((variant): TeamCompetencyMatrix | null => {
+      const leadersForVariant = leaders.filter((l) => l.competency9Variant === variant);
+      const raw = computeMatricesForLeaders(leadersForVariant).find((m) => m.competencyNumber === 9);
+      return raw ? { ...raw, competency9Variant: variant } : null;
+    })
+    .filter((m): m is TeamCompetencyMatrix => m !== null);
+
+  return [...matricesExcl9, ...competency9Matrices];
 }
 
 /**

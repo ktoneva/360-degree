@@ -1,5 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LEADER_LEVEL_LABELS, type CompetencyVariant, type LeaderLevel, type RaterGroup } from "@/lib/types";
+import {
+  LEADER_LEVEL_LABELS,
+  SLT_LEVELS,
+  type CompetencyVariant,
+  type RaterGroup,
+  type TeamReportLevel,
+} from "@/lib/types";
 import {
   computeTeamItemAggregate,
   computeTeamMatrix,
@@ -9,6 +15,7 @@ import {
   type TeamLeaderInput,
 } from "@/lib/scoring";
 import { getCycleItems, type CycleItem } from "./get-cycle-items";
+import { fetchAllRows } from "./fetch-all-rows";
 
 export interface TeamReportLeader {
   leaderId: string;
@@ -80,9 +87,10 @@ function computeInitials(names: string[]): Map<string, string> {
  */
 export async function buildTeamReportData(
   organisationId: string,
-  level: LeaderLevel,
+  level: TeamReportLevel,
 ): Promise<TeamReportData | null> {
   const supabase = createAdminClient();
+  const levelLabel = level === "slt" ? "SLT" : LEADER_LEVEL_LABELS[level];
 
   const { data: organisation, error: orgError } = await supabase
     .from("organisations")
@@ -92,23 +100,28 @@ export async function buildTeamReportData(
   if (orgError) throw new Error(orgError.message);
   if (!organisation) return null;
 
-  const { data: cycles, error: cyclesError } = await supabase
+  let cyclesQuery = supabase
     .from("review_cycles")
     .select(
       "id, competency_9_variant, period_start, period_end, anonymity_threshold_override, review_subjects(full_name)",
     )
     .eq("organisation_id", organisationId)
-    .eq("level", level)
     // Only cycles manually marked complete ever feed this report -- an open
     // cycle's numbers could still change.
     .eq("status", "closed");
+  // SLT (Design decisions, row 26) genuinely pools 3 levels into 1 comparison
+  // group, not 3 separate sections -- a single .in() query, not 3 queries
+  // merged afterwards, so every leader below is already 1 flat pool.
+  cyclesQuery = level === "slt" ? cyclesQuery.in("level", SLT_LEVELS) : cyclesQuery.eq("level", level);
+
+  const { data: cycles, error: cyclesError } = await cyclesQuery;
   if (cyclesError) throw new Error(cyclesError.message);
 
   const emptyNotes = { strengths: [], gaps: [], stretch: [], development: [] };
   if (!cycles || cycles.length === 0) {
     return {
       organisationName: organisation.name,
-      levelLabel: LEADER_LEVEL_LABELS[level],
+      levelLabel,
       leaders: [],
       periodStart: null,
       periodEnd: null,
@@ -117,40 +130,65 @@ export async function buildTeamReportData(
     };
   }
 
-  const variant = cycles[0].competency_9_variant as CompetencyVariant;
-  const items = await getCycleItems(supabase, variant);
-  const itemMeta = new Map(items.map((i) => [i.id, i]));
-  const competencyNameByNumber = new Map(items.map((i) => [i.competencyNumber, i.competencyName]));
+  // Fetch the item bank for every competency-9 variant actually present in
+  // the pool -- almost always just 1, but SLT can genuinely span both if its
+  // 3 levels mix teaching and non-teaching leaders (Design decisions, row 26
+  // / Team report logic, step 3). Competencies 1-8 are identical either way;
+  // only competency 9's items differ per variant.
+  const variantsPresent = [...new Set(cycles.map((c) => c.competency_9_variant as CompetencyVariant))];
+  const itemsByVariant = new Map<CompetencyVariant, CycleItem[]>();
+  for (const variant of variantsPresent) {
+    itemsByVariant.set(variant, await getCycleItems(supabase, variant));
+  }
+
+  const itemMeta = new Map<string, CycleItem>();
+  const competencyNameByNumber = new Map<number, string>();
+  const competency9NameByVariant = new Map<CompetencyVariant, string>();
+  for (const [variant, items] of itemsByVariant) {
+    for (const item of items) {
+      itemMeta.set(item.id, item);
+      if (item.competencyNumber === 9) {
+        competency9NameByVariant.set(variant, item.competencyName);
+      } else {
+        competencyNameByNumber.set(item.competencyNumber, item.competencyName);
+      }
+    }
+  }
 
   const cycleIds = cycles.map((c) => c.id);
-  const { data: raters, error: ratersError } = await supabase
-    .from("raters")
-    .select("id, review_cycle_id, rater_group")
-    .in("review_cycle_id", cycleIds)
-    .is("archived_at", null);
-  if (ratersError) throw new Error(ratersError.message);
+  const raters = await fetchAllRows<{ id: string; review_cycle_id: string; rater_group: string }>((from, to) =>
+    supabase
+      .from("raters")
+      .select("id, review_cycle_id, rater_group")
+      .in("review_cycle_id", cycleIds)
+      .is("archived_at", null)
+      .range(from, to),
+  );
 
-  const raterIds = (raters ?? []).map((r) => r.id as string);
-  const { data: responses, error: responsesError } =
+  const raterIds = raters.map((r) => r.id);
+  const responses =
     raterIds.length === 0
-      ? { data: [], error: null }
-      : await supabase
-          .from("responses")
-          .select("rater_id, item_id, scale_value, integrity_value")
-          .in("rater_id", raterIds);
-  if (responsesError) throw new Error(responsesError.message);
+      ? []
+      : await fetchAllRows<{ rater_id: string; item_id: string; scale_value: number | null; integrity_value: string | null }>(
+          (from, to) =>
+            supabase
+              .from("responses")
+              .select("rater_id, item_id, scale_value, integrity_value")
+              .in("rater_id", raterIds)
+              .range(from, to),
+        );
 
   const ratersByCycle = new Map<string, { id: string; group: string }[]>();
-  for (const r of raters ?? []) {
-    const list = ratersByCycle.get(r.review_cycle_id as string) ?? [];
-    list.push({ id: r.id as string, group: r.rater_group as string });
-    ratersByCycle.set(r.review_cycle_id as string, list);
+  for (const r of raters) {
+    const list = ratersByCycle.get(r.review_cycle_id) ?? [];
+    list.push({ id: r.id, group: r.rater_group });
+    ratersByCycle.set(r.review_cycle_id, list);
   }
   const responsesByRater = new Map<string, typeof responses>();
-  for (const resp of responses ?? []) {
-    const list = responsesByRater.get(resp.rater_id as string) ?? [];
+  for (const resp of responses) {
+    const list = responsesByRater.get(resp.rater_id) ?? [];
     list.push(resp);
-    responsesByRater.set(resp.rater_id as string, list);
+    responsesByRater.set(resp.rater_id, list);
   }
 
   const leaderNames = new Map<string, string>();
@@ -161,10 +199,18 @@ export async function buildTeamReportData(
     const cycleRaters = ratersByCycle.get(cycle.id) ?? [];
     const cycleResponses = cycleRaters.flatMap((r) => responsesByRater.get(r.id) ?? []);
 
+    const cycleVariant = cycle.competency_9_variant as CompetencyVariant;
+    // This leader's own item list -- competencies 1-8 plus only their own
+    // competency-9 variant, never the other one, even when the pool (SLT)
+    // spans both (Team report logic, step 3; computeTeamMatrix relies on
+    // this to keep the 2 variants from ever landing in the same matrix).
+    const leaderItems = itemsByVariant.get(cycleVariant) ?? [];
+
     return {
       leaderId: cycle.id,
+      competency9Variant: cycleVariant,
       dataset: {
-        items: items.map((i) => ({
+        items: leaderItems.map((i) => ({
           id: i.id,
           competencyNumber: i.competencyNumber,
           itemNumber: i.itemNumber,
@@ -198,7 +244,13 @@ export async function buildTeamReportData(
   const rawMatrices: TeamCompetencyMatrix[] = computeTeamMatrix(teamLeaders);
   const matrices: TeamReportMatrix[] = rawMatrices.map((m) => ({
     competencyNumber: m.competencyNumber,
-    competencyName: competencyNameByNumber.get(m.competencyNumber) ?? "",
+    // Competency 9's name depends on which variant this particular matrix
+    // is (only ever set when the pool spans both); every other competency
+    // has exactly one name regardless of variant.
+    competencyName:
+      m.competencyNumber === 9 && m.competency9Variant
+        ? (competency9NameByVariant.get(m.competency9Variant) ?? "")
+        : (competencyNameByNumber.get(m.competencyNumber) ?? ""),
     items: m.items.map((row) => ({
       itemId: row.itemId,
       itemNumber: row.itemNumber,
@@ -225,7 +277,7 @@ export async function buildTeamReportData(
   // Starting-point candidates for the editable "whole team, at a glance"
   // page -- computed fresh every time as a fallback, overridden per-slot by
   // whatever the consultant has actually saved.
-  const allItemIds = items.filter((i) => !i.isIntegrityItem).map((i) => i.id);
+  const allItemIds = [...itemMeta.values()].filter((i) => !i.isIntegrityItem).map((i) => i.id);
   const itemAggregates = allItemIds
     .map((itemId) => ({ itemId, aggregate: computeTeamItemAggregate(teamLeaders, itemId) }))
     .filter((r) => r.aggregate.mode !== "insufficient")
@@ -309,7 +361,7 @@ export async function buildTeamReportData(
 
   return {
     organisationName: organisation.name,
-    levelLabel: LEADER_LEVEL_LABELS[level],
+    levelLabel,
     leaders,
     periodStart: cycles.map((c) => c.period_start as string).sort()[0] ?? null,
     periodEnd: cycles.map((c) => c.period_end as string).sort().slice(-1)[0] ?? null,

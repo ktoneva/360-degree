@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buildTeamReportData } from "@/lib/report/build-team-report-data";
-import { LEADER_LEVELS, LEADER_LEVEL_LABELS, type LeaderLevel } from "@/lib/types";
+import { LEADER_LEVELS, LEADER_LEVEL_LABELS, isTeamReportLevel } from "@/lib/types";
 import { TeamReportView } from "./team-report-view";
 import { PrintButton } from "../../../cycles/[id]/report/print-button";
 
 export const dynamic = "force-dynamic";
-
-function isLeaderLevel(value: string): value is LeaderLevel {
-  return (LEADER_LEVELS as string[]).includes(value);
-}
 
 export default async function TeamReportPage({
   params,
@@ -20,7 +16,7 @@ export default async function TeamReportPage({
 }) {
   const { id } = await params;
   const { level: levelParam } = await searchParams;
-  const level = levelParam && isLeaderLevel(levelParam) ? levelParam : null;
+  const level = levelParam && isTeamReportLevel(levelParam) ? levelParam : null;
 
   if (!level) {
     return (
@@ -43,6 +39,17 @@ export default async function TeamReportPage({
               {LEADER_LEVEL_LABELS[l]}
             </Link>
           ))}
+        </div>
+        <p className="mt-4 mb-2 text-xs font-medium text-zinc-500">
+          Or combine the senior leadership team into 1 comparison:
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/admin/organisations/${id}/team-report?level=slt`}
+            className="rounded-full border border-amber-400 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+          >
+            SLT (Headteacher, Deputy Head, Assistant Head combined)
+          </Link>
         </div>
       </div>
     );

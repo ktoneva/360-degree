@@ -14,6 +14,7 @@ import {
   type ScoringDataset,
 } from "@/lib/scoring";
 import { getCycleItems, type CycleItem } from "./get-cycle-items";
+import { fetchAllRows } from "./fetch-all-rows";
 
 export interface ReportCompetencyTable {
   competencyNumber: number;
@@ -83,29 +84,38 @@ export async function buildIndividualReportData(cycleId: string): Promise<Indivi
 
   const raterIds = (raters ?? []).map((r) => r.id as string);
 
-  const [
-    { data: responses, error: responsesError },
-    { data: nominations, error: nominationsError },
-    { data: comments, error: commentsError },
-    { data: competencyCommentRows, error: competencyCommentsError },
-  ] = await Promise.all([
-    raterIds.length === 0
-      ? { data: [], error: null }
-      : supabase.from("responses").select("rater_id, item_id, scale_value, integrity_value").in("rater_id", raterIds),
-    raterIds.length === 0
-      ? { data: [], error: null }
-      : supabase.from("forced_choice_nominations").select("rater_id, item_id").in("rater_id", raterIds),
-    raterIds.length === 0
-      ? { data: [], error: null }
-      : supabase.from("comments").select("continue_text, start_text, stop_text").in("rater_id", raterIds),
-    raterIds.length === 0
-      ? { data: [], error: null }
-      : supabase.from("competency_comments").select("competency_number, comment_text").in("rater_id", raterIds),
-  ]);
-  if (responsesError) throw new Error(responsesError.message);
+  // A single busy leader (many raters, most of the item bank each) can
+  // plausibly exceed Supabase's unpaginated 1000-row cap on its own, so
+  // responses pages through explicitly rather than trusting one select() --
+  // the other 3 tables are bounded far below that per rater and stay as a
+  // single query each, run in parallel.
+  const [{ data: nominations, error: nominationsError }, { data: comments, error: commentsError }, { data: competencyCommentRows, error: competencyCommentsError }] =
+    await Promise.all([
+      raterIds.length === 0
+        ? { data: [], error: null }
+        : supabase.from("forced_choice_nominations").select("rater_id, item_id").in("rater_id", raterIds),
+      raterIds.length === 0
+        ? { data: [], error: null }
+        : supabase.from("comments").select("continue_text, start_text, stop_text").in("rater_id", raterIds),
+      raterIds.length === 0
+        ? { data: [], error: null }
+        : supabase.from("competency_comments").select("competency_number, comment_text").in("rater_id", raterIds),
+    ]);
   if (nominationsError) throw new Error(nominationsError.message);
   if (commentsError) throw new Error(commentsError.message);
   if (competencyCommentsError) throw new Error(competencyCommentsError.message);
+
+  const responses =
+    raterIds.length === 0
+      ? []
+      : await fetchAllRows<{ rater_id: string; item_id: string; scale_value: number | null; integrity_value: string | null }>(
+          (from, to) =>
+            supabase
+              .from("responses")
+              .select("rater_id, item_id, scale_value, integrity_value")
+              .in("rater_id", raterIds)
+              .range(from, to),
+        );
 
   const dataset: ScoringDataset = {
     items: items.map((i) => ({

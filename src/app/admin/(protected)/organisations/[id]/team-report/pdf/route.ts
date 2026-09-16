@@ -2,14 +2,10 @@ import { NextResponse } from "next/server";
 import { requireAdminUser } from "@/lib/supabase/require-admin-user";
 import { buildTeamReportData } from "@/lib/report/build-team-report-data";
 import { NotAuthenticatedError, renderUrlToPdf } from "@/lib/report/render-pdf";
-import { LEADER_LEVELS, type LeaderLevel } from "@/lib/types";
+import { isTeamReportLevel } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-function isLeaderLevel(value: string): value is LeaderLevel {
-  return (LEADER_LEVELS as string[]).includes(value);
-}
 
 /**
  * A route handler is its own endpoint -- it is NOT wrapped by the
@@ -25,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
   const levelParam = new URL(request.url).searchParams.get("level");
-  if (!levelParam || !isLeaderLevel(levelParam)) {
+  if (!levelParam || !isTeamReportLevel(levelParam)) {
     return new NextResponse("Missing or invalid level", { status: 400 });
   }
 

@@ -24,6 +24,25 @@ export const LEADER_LEVEL_LABELS: Record<LeaderLevel, string> = {
   operational_business_leader: "Operational and Business Leader",
 };
 
+/**
+ * The team summary report's leader pool: one specific level, or the "SLT"
+ * combined grouping (Design decisions, row 26) that pools headteacher,
+ * deputy head, and assistant head into a single comparison group. Never the
+ * same value as a cycle's own `level` column, which is always exactly one
+ * real level and is never "slt" -- SLT is a report-time grouping choice, not
+ * a leader's actual level.
+ */
+export type TeamReportLevel = LeaderLevel | "slt";
+
+/** The 3 levels SLT pools together. Middle leader and operational/business
+ * leader are explicitly excluded, by design decision, and stay as their own
+ * single-level reports. */
+export const SLT_LEVELS: LeaderLevel[] = ["headteacher", "deputy_head", "assistant_head"];
+
+export function isTeamReportLevel(value: string): value is TeamReportLevel {
+  return value === "slt" || (LEADER_LEVELS as string[]).includes(value);
+}
+
 export const RATER_GROUPS: RaterGroup[] = [
   "self",
   "manager",

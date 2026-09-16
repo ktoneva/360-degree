@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { saveTeamReportNote } from "@/app/admin/actions";
-import type { LeaderLevel } from "@/lib/types";
+import type { TeamReportLevel } from "@/lib/types";
 
 type Card = "strengths" | "gaps" | "stretch" | "development";
 
@@ -15,7 +15,7 @@ export function TeamNoteEditor({
   initialWhat,
 }: {
   organisationId: string;
-  level: LeaderLevel;
+  level: TeamReportLevel;
   card: Card;
   position: 1 | 2;
   initialWho: string;

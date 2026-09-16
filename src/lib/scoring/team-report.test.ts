@@ -5,12 +5,17 @@ import {
   computeTeamPatternCandidates,
   type TeamLeaderInput,
 } from "./team-report";
-import { ITEM_C1, buildDataset, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
+import { ITEM_C1, buildDataset, itemFor, makeRaters, resetRaterCounter, scaleResponse } from "./test-utils";
+import { ALL_RATER_GROUPS } from "./types";
 
 beforeEach(() => resetRaterCounter());
 
-function leader(id: string, overrides: Partial<Parameters<typeof buildDataset>[0]> = {}): TeamLeaderInput {
-  return { leaderId: id, dataset: buildDataset(overrides) };
+function leader(
+  id: string,
+  overrides: Partial<Parameters<typeof buildDataset>[0]> = {},
+  competency9Variant: "standard" | "ops" = "standard",
+): TeamLeaderInput {
+  return { leaderId: id, dataset: buildDataset(overrides), competency9Variant };
 }
 
 describe("computeTeamMatrix", () => {
@@ -64,6 +69,82 @@ describe("computeTeamMatrix", () => {
     });
     const [c1] = computeTeamMatrix([one]);
     expect(c1.gapInsight).toEqual({ leaderId: "A", itemId: ITEM_C1.id, selfScore: 5, othersScore: 2, gap: 3 });
+  });
+
+  it("produces exactly 1 competency-9 matrix when every leader shares the same variant (the common case, SLT or not)", () => {
+    const item9 = itemFor("std-9-1", 9, 1, ALL_RATER_GROUPS);
+    const peersA = makeRaters("peer", 3);
+    const a = leader(
+      "A",
+      { items: [item9], raters: peersA, responses: peersA.map((r) => scaleResponse(r.id, item9.id, 5)) },
+      "standard",
+    );
+    const peersB = makeRaters("peer", 3);
+    const b = leader(
+      "B",
+      { items: [item9], raters: peersB, responses: peersB.map((r) => scaleResponse(r.id, item9.id, 4)) },
+      "standard",
+    );
+
+    const matrices = computeTeamMatrix([a, b]);
+    const nineMatrices = matrices.filter((m) => m.competencyNumber === 9);
+    expect(nineMatrices).toHaveLength(1);
+    expect(nineMatrices[0].competency9Variant).toBe("standard");
+    expect(nineMatrices[0].items[0].cells.map((c) => c.leaderId)).toEqual(["A", "B"]);
+  });
+
+  it("splits competency 9 into 2 independent matrices when the pool spans both variants (SLT), never blending them", () => {
+    const stdItem = itemFor("std-9-1", 9, 1, ALL_RATER_GROUPS);
+    const opsItem = itemFor("ops-9-1", 9, 1, ALL_RATER_GROUPS);
+
+    const peersStd = makeRaters("peer", 3);
+    const headteacher = leader(
+      "HT",
+      { items: [stdItem], raters: peersStd, responses: peersStd.map((r) => scaleResponse(r.id, stdItem.id, 5)) },
+      "standard",
+    );
+    const peersOps = makeRaters("peer", 3);
+    const businessManager = leader(
+      "BM",
+      { items: [opsItem], raters: peersOps, responses: peersOps.map((r) => scaleResponse(r.id, opsItem.id, 3)) },
+      "ops",
+    );
+
+    const matrices = computeTeamMatrix([headteacher, businessManager]);
+    const nineMatrices = matrices.filter((m) => m.competencyNumber === 9);
+    expect(nineMatrices).toHaveLength(2);
+
+    const standardMatrix = nineMatrices.find((m) => m.competency9Variant === "standard")!;
+    const opsMatrix = nineMatrices.find((m) => m.competency9Variant === "ops")!;
+
+    // Each matrix is built only from the leaders who used that version --
+    // not every SLT leader as a column with blanks for the other variant.
+    expect(standardMatrix.items[0].cells.map((c) => c.leaderId)).toEqual(["HT"]);
+    expect(standardMatrix.items[0].cells[0].allOthers).toBe(5);
+    expect(opsMatrix.items[0].cells.map((c) => c.leaderId)).toEqual(["BM"]);
+    expect(opsMatrix.items[0].cells[0].allOthers).toBe(3);
+  });
+
+  it("competencies 1-8 still include every leader together, even when competency 9 splits by variant", () => {
+    const stdItem = itemFor("std-9-1", 9, 1, ALL_RATER_GROUPS);
+    const opsItem = itemFor("ops-9-1", 9, 1, ALL_RATER_GROUPS);
+
+    const peersA = makeRaters("peer", 3);
+    const a = leader(
+      "A",
+      { items: [ITEM_C1, stdItem], raters: peersA, responses: peersA.map((r) => scaleResponse(r.id, ITEM_C1.id, 4)) },
+      "standard",
+    );
+    const peersB = makeRaters("peer", 3);
+    const b = leader(
+      "B",
+      { items: [ITEM_C1, opsItem], raters: peersB, responses: peersB.map((r) => scaleResponse(r.id, ITEM_C1.id, 2)) },
+      "ops",
+    );
+
+    const matrices = computeTeamMatrix([a, b]);
+    const c1 = matrices.find((m) => m.competencyNumber === 1)!;
+    expect(c1.items[0].cells.map((c) => c.leaderId)).toEqual(["A", "B"]);
   });
 });
 

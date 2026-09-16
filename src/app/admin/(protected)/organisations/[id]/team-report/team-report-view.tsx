@@ -1,5 +1,5 @@
 import type { TeamReportData } from "@/lib/report/build-team-report-data";
-import type { LeaderLevel } from "@/lib/types";
+import type { TeamReportLevel } from "@/lib/types";
 import { TeamNoteEditor } from "./team-note-editor";
 
 const TOTAL_PAGES = 13;
@@ -92,7 +92,7 @@ function NoteCard({
   card: "strengths" | "gaps" | "stretch" | "development";
   entries: { who: string; what: string }[];
   organisationId: string;
-  level: LeaderLevel;
+  level: TeamReportLevel;
 }) {
   return (
     <div className="team-card">
@@ -121,7 +121,7 @@ export function TeamReportView({
 }: {
   data: TeamReportData;
   organisationId: string;
-  level: LeaderLevel;
+  level: TeamReportLevel;
 }) {
   let pageNum = 4;
 
